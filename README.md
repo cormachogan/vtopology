@@ -4,6 +4,7 @@ kubelet plugin testing for displaying vSphere topology from kubectl
 The bash script requires gpvc, the VMware govmomi API CLI
 
 Usage: kubectl vtopology <arg>
+  
   where arg is one of the following:
   
         -e | --hosts
