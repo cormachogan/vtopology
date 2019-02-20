@@ -27,6 +27,7 @@ usage()
 	echo "  where arg is one of the following:"
 	echo "	-e | --hosts"
 	echo "	-v | --vms"
+	echo "	-k | --k8svms"
 	echo "	-n | --networks"
 	echo "	-d | --datastores"
 	echo "	-a | --all"
@@ -80,6 +81,9 @@ get_all()
 	echo "*** Networks ..."
 	get_networks
 	echo
+	echo "*** Kubernetes VMs ..."
+	get_k8svms
+	echo
 }
 #
 #######################################################################
@@ -103,6 +107,39 @@ get_vms()
 	done
 }
 
+#
+#######################################################################
+#
+# Get Kubernetes VMs
+#
+#######################################################################
+#
+
+get_k8svms()
+{
+	echo
+	DATACENTER=`govc ls`
+	
+	for i in ${DATACENTER[@]}; do
+	
+		if [[ $i =~ vm ]]; then
+
+		K8SVMS=`kubectl get nodes -o wide | awk '{print $7}'`
+
+			for j in ${K8SVMS[@]}; do
+				if [[ $j =~ EXTERNAL ]]
+				then
+					echo
+					#no-op
+				else
+#					echo "DEBUG: EXTERNAL IP OF K8s NODE: $j"
+					govc vm.info -vm.ip=${j}
+					echo
+				fi
+			done
+		fi
+	done
+}
 #
 #######################################################################
 #
@@ -215,6 +252,9 @@ else
 			;;
 		-d|--datastores)
 			get_datastores
+			;;
+		-k|--k8svms)
+			get_k8svms
 			;;
 		-a|--all)
 			get_all
