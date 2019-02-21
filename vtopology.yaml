@@ -1,0 +1,24 @@
+apiVersion: krew.googlecontainertools.github.com/v1alpha2
+kind: Plugin
+metadata:
+  name: vtopology
+spec:
+  version: "v1"
+  platforms:
+  - selector:
+      matchExpressions:
+      - {key: os, operator: In, values: [darwin, linux]}
+    uri: ./vtopology.sh.tar.gz
+    sha256: "4e0227a41057b6ad9b41bbea9d69160be460e2e972788d61f138a5466f459b71"
+    files:
+    - from: "/*.sh"
+      to: "."     
+    bin: "./vtopology.sh"
+  shortDescription: Prints the vSphere topology
+  caveats: |
+    This plugin needs the following programs:
+    * govc(1)
+  description: |
+    This plugin shows underlying vSphere infrastructure details
+    when Kubernetes is running on vSphere. Use the -h | --help
+    option to get more description and example usages.
