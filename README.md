@@ -19,6 +19,7 @@ Usage: kubectl vtopology arg
         
         -h | --help
         
+        -pv <pvid> 
 
 Note this tool requires VMware GO API CLI - govc
 It can be found here: https://github.com/vmware/govmomi/releases
