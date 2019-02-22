@@ -23,5 +23,4 @@ Usage: kubectl vtopology arg
         
         -kn <k8s node name>
 
-Note this tool requires VMware GO API CLI - govc
-It can be found here: https://github.com/vmware/govmomi/releases
+Note this tool requires VMware GO API CLI - govc - It can be found here: https://github.com/vmware/govmomi/releases
