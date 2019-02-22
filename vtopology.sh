@@ -3,7 +3,7 @@
 # Simple kubectl plugin which will display some of the topology 
 # information from a vsphere cluster, using Govc - the CLI
 # that uses the vmware/govmomi (the GO library for the VMware
-# vSphere APIs
+# vSphere APIs)
 #
 # Author: CJH - 20th Feb 2019
 #
@@ -28,14 +28,15 @@ usage()
 	echo "  where arg is one of the following:"
 	echo "	-e | --hosts"
 	echo "	-v | --vms"
-	echo "	-k | --k8svms"
 	echo "	-n | --networks"
 	echo "	-d | --datastores"
+	echo "	-k | --k8svms"
 	echo "	-a | --all"
 	echo "	-h | --help"
 	echo
 	echo "Advanced options"
-	echo "	-pv <pvid>  - display vSphere details about a Persistent Volume"
+	echo "	-pv <pv_id>   - display vSphere storage details about a Persistent Volume"
+	echo "	-kn <node_id> - display vSphere VM details about a Kubernetes node"
 	echo
 	echo "Note this tool requires VMware GO API CLI - govc"
 	echo "It can be found here: https://github.com/vmware/govmomi/releases"
@@ -82,6 +83,9 @@ check_deps()
 # GOVC_PASSWORD='Passwd of valid vCenter or ESXi user'
 # GOVC_INSECURE=true
 #
+# TODO: Read these in from a file (securely, without plain text password)
+# TODO: Use certs (ugh!)
+#
 export GOVC_URL="https://vcsa-06-b.rainpole.com"
 export GOVC_USERNAME='administrator@vsphere.local'
 export GOVC_PASSWORD='VMware123.'
@@ -96,7 +100,7 @@ export GOVC_INSECURE=true
 #######################################################################
 #
 # Display Everything...
-# Get the path to VMs, Networks, Hosts and Datastores
+# Get the path to VMs, Networks, Hosts, Datastores and K8s nodes
 #
 #######################################################################
 #
@@ -121,7 +125,7 @@ get_all()
 #
 #######################################################################
 #
-# Get VMs
+# Get all VMs
 #
 #######################################################################
 #
@@ -143,14 +147,13 @@ get_vms()
 #
 #######################################################################
 #
-# Get Kubernetes VMs
+# Get all Kubernetes VMs
 #
 #######################################################################
 #
 
 get_k8svms()
 {
-	echo
 	DATACENTER=`govc ls`
 	
 	for i in ${DATACENTER[@]}; do
@@ -166,6 +169,8 @@ get_k8svms()
 					#no-op
 				else
 #					echo "DEBUG: EXTERNAL IP OF K8s NODE: $j"
+					k8s_node_name=`kubectl get nodes -o wide | grep $j | awk '{print $1}'`
+					echo "K8s node name:  ${k8s_node_name}"
 					govc vm.info -vm.ip=${j}
 					echo
 				fi
@@ -173,6 +178,7 @@ get_k8svms()
 		fi
 	done
 }
+
 #
 #######################################################################
 #
@@ -269,20 +275,56 @@ get_datastores()
 #
 #######################################################################
 #
-# Get  PV info
+# Get indivual Kubernetes Node info
+#
+#######################################################################
+#
+
+get_k8s_node_info()
+{
+	node_id=${1}
+
+#	echo "DEBUG: Kubernetes Node ID is $node_id"
+
+#
+#######################################################################
+#
+# There is no way to verify this is a virtual machine on vSphere
+# We will just have to assume that it is
+#
+#######################################################################
+#
+
+	ext_ip=`kubectl get nodes $node_id -o wide --no-headers | awk '{print $7}'`
+
+	echo "K8s node name:  ${node_id}"
+	echo "External IP:    ${ext_ip}"
+	echo
+		govc vm.info -vm.ip=${ext_ip}
+	echo
+}
+
+#
+#######################################################################
+#
+# Get Persisteny Volume info
 #
 #######################################################################
 #
 
 get_pv_info()
 {
-	pvid=${1}
-	echo
-#	echo "DEBUG: PV ID is $pvid"
 
+#
+#######################################################################
 #
 # First, verify this is a vSphere volume
 #
+#######################################################################
+#
+	pvid=${1}
+
+#	echo "DEBUG: PV ID is $pvid"
 
 	is_vsphere=`kubectl describe pv $pvid | grep "    Type" | awk '{print $2}'`
 
@@ -291,21 +333,30 @@ get_pv_info()
 	pv_datastore=`kubectl describe pv $pvid | grep "    VolumePath:" | awk '{print $2}' | sed 's/[][]//g'`
 	else
 		echo "Does not appear to be a PV on vSphere storage - $is_vsphere"
-		exit;
+		exit
 	fi
-	
-#	echo "DEBUG: Path to VMDK = $pv_volpath"
-#	echo "DEBUG: Datastore = $pv_datastore"
+#		echo "DEBUG: Path to VMDK = $pv_volpath"
+#	 	echo "DEBUG: Datastore = $pv_datastore"
 
-echo
-echo "*** PV $pvid is on datastore $pv_datastore"
-echo
+#
+#######################################################################
+#
+# OK - its definetely a vSphere volume - lets dump some useful info
+#
+#######################################################################
+#
+
+	echo
+	echo "*** PV $pvid is on datastore $pv_datastore"
+	echo
 	govc datastore.info $pv_datastore
-echo
-echo "*** PV $pvid is VMDK $pv_volpath"
-echo
+
+	echo
+	echo "*** PV $pvid is VMDK $pv_volpath"
+	echo
 	govc datastore.disk.info -ds $pv_datastore $pv_volpath
-echo
+
+	echo
 }
 
 ######################################################################
@@ -344,7 +395,28 @@ else
 			usage
 			;;
 		-pv)
-			get_pv_info $2
+			# Check that PV ID was supplied
+			if [[ -z $2 ]]
+			then
+				echo "No Persistent Volume ID supplied - please provide the PV ID after -pv"
+				echo "The PV ID can be found using kubectl get pv"
+				echo
+				exit
+			else
+				get_pv_info $2
+			fi
+			;;
+		-kn)
+			# Check that Node name was supplied
+			if [[ -z $2 ]]
+			then
+				echo "No Kubernetes Node name supplied - please provide the Node name after -kn"
+				echo "The Node name can be found using kubectl get nodes"
+				echo
+				exit
+			else
+				get_k8s_node_info $2
+			fi
 			;;
 		*)
 			usage
