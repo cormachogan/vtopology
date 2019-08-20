@@ -48,7 +48,7 @@ Advanced args
 
 ## Sample outputs:
 ```
-kubectl vtopology -vc 10.27.51.106 -u administrator@vsphere.local -p VMware123. -e
+kubectl vtopology -vc 1.2.3.4 -u administrator@vsphere.local -p password -e
 
 *** This command is being run against the following Kubernetes configuration context:  kubernetes-admin@kubernetes
 
@@ -113,7 +113,7 @@ Found DataCenter:  CH-Datacenter
                         Memory Used (GB)  :  54.6357421875
 
 
-kubectl vtopology -vc 10.27.51.106 -u administrator@vsphere.local -p VMware123. -k
+kubectl vtopology -vc 1.2.3.4 -u administrator@vsphere.local -p password -k
 
 *** This command is being run against the following Kubernetes configuration context:  kubernetes-admin@kubernetes
 
@@ -159,7 +159,7 @@ Kubernetes Node VM Name  :  k8s-worker2
         Used Space (GB)        :  14.959641523659229278564453125
        
 
-kubectl vtopology -vc 10.27.51.106 -u administrator@vsphere.local -p VMware123. -pv pvc-0cc1a552-c2a5-11e9-80e4-005056a239d9
+kubectl vtopology -vc 1.2.3.4 -u administrator@vsphere.local -p password -pv pvc-0cc1a552-c2a5-11e9-80e4-005056a239d9
 
 *** This command is being run against the following Kubernetes configuration context:  kubernetes-admin@kubernetes
 
