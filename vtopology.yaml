@@ -8,16 +8,16 @@ spec:
   - selector:
       matchExpressions:
       - {key: os, operator: In, values: [darwin, linux]}
-    uri: ./vtopology.sh.tar.gz
-    sha256: "97415e1e030a0cbf101f3e18858dfe1084569b61bb774e5a5b6ff7dad3f59dc3"
+    uri: ./vtopology-ps.sh.tar.gz
+    sha256: "49fcdfd591bbd62280a15ab069239e6139a2f5dfa772c2628ed6dcda9e998e54"
     files:
-    - from: "/*.sh"
+    - from: "/*.ps1"
       to: "."     
-    bin: "./vtopology.sh"
+    bin: "./vtopology.ps1"
   shortDescription: Prints the vSphere topology
   caveats: |
     This plugin needs the following programs:
-    * govc (Go CLI) from VMware
+    * PowerShell, PowerCLI and kubectl
   description: |
     This plugin shows underlying vSphere infrastructure details
     when Kubernetes is running on vSphere. Use the -h | --help
