@@ -1,8 +1,8 @@
 # vtopology
 
-krew plugin (using a combination of bash and Powershell/PowerCLI) for displaying vSphere topology from kubectl
+This is a krew plugin (using a combination of bash and Powershell/PowerCLI) for displaying vSphere topology from kubectl
 
-For moreinformation about krew, go here: https://github.com/kubernetes-sigs/krew/blob/master/README.md
+For more information about krew, go here: https://github.com/kubernetes-sigs/krew/blob/master/README.md
 
 For PowerShell and PowerCLI deployment instructions, go here:
 https://blog.inkubate.io/install-powershell-and-powercli-on-ubuntu-16-04/
