@@ -9,7 +9,7 @@ https://blog.inkubate.io/install-powershell-and-powercli-on-ubuntu-16-04/
 
 
 For deployment instructions, download the yaml and gz archivem and install with krew as follows:
-
+```
 kubectl krew  install --manifest=vtopology.yaml --archive=vtopology.tar.gz
 Installing plugin: vtopology
 CAVEATS:
@@ -18,8 +18,10 @@ CAVEATS:
  |  * PowerShell and PowerCLI
 /
 Installed plugin: vtopology
+```
 
-
+Usage
+```
 Usage: kubectl vtopology <connect-args> <args>
 
   where connect-args (optionally) includes the following:
@@ -39,10 +41,10 @@ Usage: kubectl vtopology <connect-args> <args>
 Advanced args
   -pv <pv_id>     - display vSphere storage details about a Persistent Volume
   -kn <node_name> - display vSphere VM details about a Kubernetes node
-
+```
 
 Sample outputs:
-
+```
 kubectl vtopology -vc 10.27.51.106 -u administrator@vsphere.local -p VMware123. -e
 
 *** This command is being run against the following Kubernetes configuration context:  kubernetes-admin@kubernetes
@@ -182,3 +184,4 @@ kubectl vtopology -vc 10.27.51.106 -u administrator@vsphere.local -p VMware123. 
         Hard Disk Name     :  Hard disk 2
         Policy Name        :  Space-Efficient
         Policy Compliance  :  compliant
+```
