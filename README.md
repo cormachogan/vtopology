@@ -10,7 +10,7 @@ https://blog.inkubate.io/install-powershell-and-powercli-on-ubuntu-16-04/
 
 ## Deployment instructions
 
-Download both the yaml and gz archivem and install with krew as follows:
+Download both the yaml and gz archives and install with krew as follows:
 
 ```
 kubectl krew  install --manifest=vtopology.yaml --archive=vtopology.tar.gz
