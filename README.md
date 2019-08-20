@@ -10,7 +10,7 @@ For PowerShell and PowerCLI deployment instructions on Ubuntu, go here:
 https://blog.inkubate.io/install-powershell-and-powercli-on-ubuntu-16-04/
 
 
-## Deployment instructions
+## vtopology Deployment instructions
 
 Download both the yaml and gz archives and install with krew as follows:
 
