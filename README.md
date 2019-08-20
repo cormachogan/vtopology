@@ -15,7 +15,7 @@ https://blog.inkubate.io/install-powershell-and-powercli-on-ubuntu-16-04/
 Download both the yaml and gz archives and install with krew as follows:
 
 ```
-kubectl krew  install --manifest=vtopology.yaml --archive=vtopology.tar.gz
+$ kubectl krew  install --manifest=vtopology.yaml --archive=vtopology.tar.gz
 Installing plugin: vtopology
 CAVEATS:
 \
@@ -50,7 +50,7 @@ Advanced args
 
 ## Sample outputs:
 ```
-kubectl vtopology -vc 1.2.3.4 -u administrator@vsphere.local -p password -e
+$ kubectl vtopology -vc 1.2.3.4 -u administrator@vsphere.local -p password -e
 
 *** This command is being run against the following Kubernetes configuration context:  kubernetes-admin@kubernetes
 
@@ -114,8 +114,9 @@ Found DataCenter:  CH-Datacenter
                         Total Memory (GB) :  127.9084625244140625
                         Memory Used (GB)  :  54.6357421875
 
+---
 
-kubectl vtopology -vc 1.2.3.4 -u administrator@vsphere.local -p password -k
+$ kubectl vtopology -vc 1.2.3.4 -u administrator@vsphere.local -p password -k
 
 *** This command is being run against the following Kubernetes configuration context:  kubernetes-admin@kubernetes
 
@@ -160,8 +161,9 @@ Kubernetes Node VM Name  :  k8s-worker2
         Provisioned Space (GB) :  65.084641523659229278564453125
         Used Space (GB)        :  14.959641523659229278564453125
        
+---
 
-kubectl vtopology -vc 1.2.3.4 -u administrator@vsphere.local -p password -pv pvc-0cc1a552-c2a5-11e9-80e4-005056a239d9
+$ kubectl vtopology -vc 1.2.3.4 -u administrator@vsphere.local -p password -pv pvc-0cc1a552-c2a5-11e9-80e4-005056a239d9
 
 *** This command is being run against the following Kubernetes configuration context:  kubernetes-admin@kubernetes
 
