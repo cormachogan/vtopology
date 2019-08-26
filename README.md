@@ -2,7 +2,7 @@
 
 ## Introduction
 
-vtopology is a krew plugin which runs a combination of bash and Powershell/PowerCLI for displaying vSphere topology from kubectl. The idea is that you should be able to map Kubernetes objects (e.g. nodes, VMs) to vSphere objects (e.g. virtual machines, VMDKs). Once installed, users can run kubectl vtopology and display underlying vSphere infrastructure components to see how their Kubernetes cluster is consuming vSphere resources.
+vtopology is a krew plugin which runs a combination of bash and Powershell/PowerCLI for displaying vSphere topology from kubectl. The idea is that you should be able to map Kubernetes objects (e.g. nodes, PVs) to vSphere objects (e.g. virtual machines, VMDKs). Once installed, users can run kubectl vtopology and display underlying vSphere infrastructure components to see how their Kubernetes cluster is consuming vSphere resources.
 
 For more information about krew, go here: https://github.com/kubernetes-sigs/krew/blob/master/README.md
 
