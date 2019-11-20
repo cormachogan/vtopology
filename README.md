@@ -40,6 +40,7 @@ Usage: kubectl vtopology <connect-args> <args>
   -n | --networks
   -d | --datastores
   -k | --k8svms
+  -t | --tags
   -a | --all
   -h | --help
 
