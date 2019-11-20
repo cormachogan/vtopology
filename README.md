@@ -4,15 +4,17 @@
 
 vtopology is a krew plugin which runs a combination of bash and Powershell/PowerCLI for displaying vSphere topology from kubectl. The idea is that you should be able to map Kubernetes objects (e.g. nodes, PVs) to vSphere objects (e.g. virtual machines, VMDKs). Once installed, users can run kubectl vtopology and display underlying vSphere infrastructure components to see how their Kubernetes cluster is consuming vSphere resources.
 
-For more information about krew, go here: https://github.com/kubernetes-sigs/krew/blob/master/README.md
+For more information about how to install krew, go here: https://github.com/kubernetes-sigs/krew/blob/master/README.md
 
 For PowerShell and PowerCLI deployment instructions on Ubuntu, go here:
-https://blog.inkubate.io/install-powershell-and-powercli-on-ubuntu-16-04/
+https://blog.inkubate.io/install-powershell-and-powercli-on-ubuntu-16-04/ (modify the instructions to point to the repo of your choice)
+
+This tool has been tested and validated on Ubuntu 17.04. It has also been tested and validated on MacOS (Darwin) but the shell interpreter path to PowerShell (line 1 of vtopology.ps1 script) needs to be changed accordingly.
 
 
 ## vtopology Deployment instructions
 
-Download both the yaml and gz archives and install with krew as follows:
+Download both the yaml and gz archives and install vToplogy with krew as follows:
 
 ```
 $ kubectl krew  install --manifest=vtopology.yaml --archive=vtopology.tar.gz
