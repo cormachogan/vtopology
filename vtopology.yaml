@@ -7,9 +7,9 @@ spec:
   platforms:
   - selector:
       matchExpressions:
-      - {key: os, operator: In, values: [darwin, linux]}
-    uri: ./vtopology-ps.sh.tar.gz
-    sha256: "49fcdfd591bbd62280a15ab069239e6139a2f5dfa772c2628ed6dcda9e998e54"
+      - {key: os, operator: In, values: [linux]}
+    uri: ./vtopology.tar.gz
+    sha256: "577d64c66d961f253bb816e8d3b278d6414b17d818438f97939ae6b95e635e51"
     files:
     - from: "/*.ps1"
       to: "."     
