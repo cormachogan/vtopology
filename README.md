@@ -42,6 +42,7 @@ Usage: kubectl vtopology <connect-args> <args>
   -n | --networks
   -d | --datastores
   -k | --k8svms
+  -s | --spbm
   -t | --tags
   -a | --all
   -h | --help
@@ -49,6 +50,7 @@ Usage: kubectl vtopology <connect-args> <args>
 Advanced args
   -pv <pv_id>     - display vSphere storage details about a Persistent Volume
   -kn <node_name> - display vSphere VM details about a Kubernetes node
+  -sp <policy>    - display attributes of a particular SPBM storage policy
 ```
 
 ## Sample outputs:
