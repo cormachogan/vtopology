@@ -398,14 +398,13 @@ function get_spbm([string]$server, [string]$user, [string]$pwd)
 	$connected = Connect-VIServer $server -User $user -Password $pwd -force
 
 	Write-Host "*** These are Storage Policies in use on the vSphere Infrastructure which could potentially be used for Kuberenetes StorageClasses"
-	Write-Host "*** This script does not display policies that are defined but not used"
 	Write-Host
 
-	$AllPolicies = Get-SpbmEntityConfiguration | Select -u StoragePolicy
+	$AllPolicies = Get-SpbmStoragePolicy -Requirement -Server $server
 
 	foreach ($SPBM_Policy in $AllPolicies)
 	{
-		Write-Host "`tFound Policy:" $SPBM_Policy.StoragePolicy
+		Write-Host "`tFound Policy:" $SPBM_Policy.Name
 	}
 	Write-Host
 
