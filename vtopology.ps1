@@ -1,7 +1,8 @@
-#! /usr/bin/pwsh
+#!/usr/bin/pwsh
 #
-# Simple kubectl plugin which will display some of the topology 
-# information from a vsphere cluster, using PowerShell and PowerCLI
+# Script to display some of the topology information from a vsphere cluster, using 
+# PowerShell and PowerCLI. Can be incorporated into krew for use directly with 
+# kubectl
 #
 # Author: CJH - 20 August 2019
 #
@@ -16,9 +17,9 @@
 # https://blog.inkubate.io/install-powershell-and-powercli-on-ubuntu-16-04/
 # - (although change the repo to 17.04)
 #
-# Note: I have been informed that this script will also run on Darwin, but 
-# you will need to modiy the interpeter on line 1 of this script to point
-# to the location of pwsh on your system
+# Note: I have been informed that this script will also run on MacOS/Darwin, but 
+# you will need to modiy the interpeter on line 1 of this script to point to the 
+# location of pwsh on your system
 #
 ####################################################################################
 #
@@ -26,6 +27,8 @@
 #
 # 1.0.1	Add support for query tags (datastores, datacenters, clusters, hosts)
 # 1.0.2 Display Storage Policies that could be used for StorageClasses in K8s
+# 1.0.3 Display if ESXi hosts are in a vSphere host group and if nodes are in a 
+#       vSphere VM group (supported by Enterprise PKS for AZ mapping)
 #
 ####################################################################################
 #
@@ -151,8 +154,8 @@ function get_hosts([string]$server, [string]$user, [string]$pwd)
 			{
 				Write-Host "`t`tFound ESXi HOST: " $ESXiHost.Name
 				Write-Host
-				Write-Host "`t`t`tVersion           : "$ESXiHost.Version
-				Write-Host "`t`t`tBuild             : "$ESXiHost.Build
+				Write-Host "`t`t`tvSphere Version   : "$ESXiHost.Version
+				Write-Host "`t`t`tBuild Number      : "$ESXiHost.Build
 				Write-Host "`t`t`tConnection State  : "$ESXiHost.ConnectionState
 				Write-Host "`t`t`tPower State       : "$ESXiHost.PowerState
 				Write-Host "`t`t`tManufacturer      : "$ESXiHost.Manufacturer
@@ -163,6 +166,16 @@ function get_hosts([string]$server, [string]$user, [string]$pwd)
 				Write-Host "`t`t`tTotal Memory (GB) : "$ESXiHost.memoryTotalGB
 				Write-Host "`t`t`tMemory Used (GB)  : "$ESXiHost.MemoryUsageGB
 				Write-Host
+#
+# 1.0.3 Host Group Information
+#
+				$hostGroupInfo = Get-DRSclusterGroup -VMHost $ESXiHost
+
+				foreach ($hostgroup in $hostGroupInfo)
+				{
+					Write-Host "`t`tESXi HOST" $ESXiHost.Name "is part of Host Group" $hostgroup.Name
+					Write-Host
+				}
 			}
 		}
 	}
@@ -219,9 +232,24 @@ function get_vms([string]$server, [string]$user, [string]$pwd)
 					Write-Host "`t`t`t`tFolder                 : "$VirtualMachine.Folder
 					Write-Host "`t`t`t`tNumber of CPU          : "$VirtualMachine.NumCpu
 					Write-Host "`t`t`t`tTotal Memory (GB)      : "$VirtualMachine.MemoryGB
-					Write-Host "`t`t`t`tProvisioned Space (GB) : "$VirtualMachine.ProvisionedSpaceGB
-					Write-Host "`t`t`t`tUsed Space (GB)        : "$VirtualMachine.UsedSpaceGB
+#
+# These values return far too many decimal places. This technique limits the value displayed to two decimal places
+#
+					$RoundedProvisionedSpaceGB = "{0:N2}" -f $VirtualMachine.ProvisionedSpaceGB
+					Write-Host "`t`t`t`tProvisioned Space (GB) : " $RoundedProvisionedSpaceGB
+					$RoundedUsedSpaceGB = "{0:N2}" -f $VirtualMachine.UsedSpaceGB
+					Write-Host "`t`t`t`tUsed Space (GB)        : " $RoundedUsedSpaceGB
 					Write-Host
+#
+# 1.0.3 VM/Host Group Information
+#
+					$VMGroupInfo = Get-DRSclusterGroup -VM $VirtualMachine
+
+					foreach ($vmgroup in $VMGroupInfo)
+					{
+						Write-Host "`t`t`tVirtual Machine" $VirtualMachine.Name "is part of VM/Host Group" $vmgroup.Name
+						Write-Host
+					}
 				}
 			}
 	
@@ -371,9 +399,24 @@ function get_k8s_node_info([string]$server, [string]$user, [string]$pwd, [string
 	Write-Host "`tNumber of CPU          : " $KVM.NumCpu
 	Write-Host "`tCores per Socket       : " $KVM.CoresPerSocket
 	Write-Host "`tMemory (GB)            : " $KVM.MemoryGB
-	Write-Host "`tProvisioned Space (GB) : " $KVM.ProvisionedSpaceGB
-	Write-Host "`tUsed Space (GB)        : " $KVM.UsedSpaceGB
+#
+# These values return far too many decimal places. This technique limits the value displayed to two decimal places
+#
+	$RoundedProvisionedSpaceGB = "{0:N2}" -f $KVM.ProvisionedSpaceGB
+	Write-Host "`tProvisioned Space (GB) : " $RoundedProvisionedSpaceGB
+	$RoundedUsedSpaceGB = "{0:N2}" -f $KVM.UsedSpaceGB
+	Write-Host "`tUsed Space (GB)        : " $RoundedUsedSpaceGB
 	Write-Host
+#
+# 1.0.3 VM/Host Group Information
+#
+	$KVMGroupInfo = Get-DRSclusterGroup -VM $KVM
+
+	foreach ($kvmgroup in $KVMGroupInfo)
+	{
+		Write-Host "`tVirtual Machine" $KVM.Name "is part of VM/Host Group" $kvmgroup.Name
+		Write-Host
+	}
 
 	Disconnect-VIServer * -Confirm:$false
 }
@@ -535,7 +578,6 @@ function get_k8svms([string]$server, [string]$user, [string]$pwd)
 #
 # -- slowest part of script - need to find a better way of finding the VM
 #
-			#$K8SVMS = Get-VM -NoRecursion | where { $_.Guest.IPAddress -match $IPAddress } 
 			$K8SVMS = Get-VM -NoRecursion | where { $_.Guest.IPAddress -eq $IPAddress } 
 
 			foreach ($KVM in $K8SVMS)
@@ -551,9 +593,24 @@ function get_k8svms([string]$server, [string]$user, [string]$pwd)
 				Write-Host "`tNumber of CPU          : " $KVM.NumCpu
 				Write-Host "`tCores per Socket       : " $KVM.CoresPerSocket
 				Write-Host "`tMemory (GB)            : " $KVM.MemoryGB
-				Write-Host "`tProvisioned Space (GB) : " $KVM.ProvisionedSpaceGB
-				Write-Host "`tUsed Space (GB)        : " $KVM.UsedSpaceGB
+#
+# These values return far too many decimal places. This technique limits the value displayed to two decimal places
+#
+				$RoundedProvisionedSpaceGB = "{0:N2}" -f $KVM.ProvisionedSpaceGB
+				Write-Host "`tProvisioned Space (GB) : " $RoundedProvisionedSpaceGB
+				$RoundedUsedSpaceGB = "{0:N2}" -f $KVM.UsedSpaceGB
+				Write-Host "`tUsed Space (GB)        : " $RoundedUsedSpaceGB
 				Write-Host
+#
+# 1.0.3 VM/Host Group Information
+#
+				$KVMGroupInfo = Get-DRSclusterGroup -VM $KVM
+
+				foreach ($kvmgroup in $KVMGroupInfo)
+				{
+					Write-Host "`tVirtual Machine" $KVM.Name "is part of VM/Host Group" $kvmgroup.Name
+					Write-Host
+				}
 			}
 		}
 	}
@@ -801,7 +858,9 @@ else
 
 		Write-Host
 		$Context = & kubectl config current-context
-		Write-Host "*** This command is being run against the following Kubernetes configuration context: " $Context
+		Write-Host "*** This command is being run against the following Kubernetes configuration context:" $Context
+		Write-Host
+		Write-Host "*** To switch to another context, use the kubectl config use-context command ***"
 		Write-Host
 
 		
@@ -907,6 +966,8 @@ else
 		Write-Host
 		$Context = & kubectl config current-context
 		Write-Host "*** This command is being run against the following Kubernetes configuration context: " $Context
+		Write-Host
+		Write-Host "*** To switch to another context, use the kubectl config use-context command ***"
 		Write-Host
 
 #

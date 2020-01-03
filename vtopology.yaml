@@ -9,7 +9,7 @@ spec:
       matchExpressions:
       - {key: os, operator: In, values: [linux]}
     uri: ./vtopology.tar.gz
-    sha256: "f34a20f5d7dba5464078723a0c902668d9b1c0a895ad5c17ab888fd15e4d3c93"
+    sha256: "fe3193bb88ca8df2bf579040a8a967c060f1c5bab35324855015f8eac251b1be"
     files:
     - from: "/*.ps1"
       to: "."     
