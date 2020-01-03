@@ -163,8 +163,13 @@ function get_hosts([string]$server, [string]$user, [string]$pwd)
 				Write-Host "`t`t`tNumber of CPU     : "$ESXiHost.NumCpu
 				Write-Host "`t`t`tTotal CPU (MHz)   : "$ESXiHost.CpuTotalMhz
 				Write-Host "`t`t`tCPU Used (MHz)    : "$ESXiHost.CpuUsageMhz
-				Write-Host "`t`t`tTotal Memory (GB) : "$ESXiHost.memoryTotalGB
-				Write-Host "`t`t`tMemory Used (GB)  : "$ESXiHost.MemoryUsageGB
+#
+# These values return far too many decimal places. This technique limits the value displayed to two decimal places
+#
+				$RoundedTotalMemory = "{0:N2}" -f $ESXiHost.memoryTotalGB
+				Write-Host "`t`t`tTotal Memory (GB) : " $RoundedTotalMemory
+				$RoundedMemoryUsed = "{0:N2}" -f $ESXiHost.MemoryUsageGB
+				Write-Host "`t`t`tMemory Used (GB)  : " $RoundedMemoryUsed
 				Write-Host
 #
 # 1.0.3 Host Group Information
@@ -324,28 +329,34 @@ function get_datastores([string]$server, [string]$user, [string]$pwd)
 			Write-Host "`tFound Cluster: " $Cluster.Name
 			Write-Host
 
-		$AllDatastores = Get-Datastore -Location $DC
+			$AllDatastores = Get-Datastore -Location $DC
 
-		foreach ($DataStore in $AllDatastores)
-		{
-			Write-Host
-			Write-Host "Found Datastore:" $DataStore.Name
-			Write-Host "`tState            : " $DataStore.state
-			Write-Host "`tDatastore Type   : " $DataStore.type
-			Write-Host "`tCapacity (GB)    : " $DataStore.CapacityGB
-			Write-Host "`tFree Space (GB)  : " $DataStore.FreeSpaceGB
-
-			$ConnectedHosts = Get-Datastore $DataStore | Get-VMHost
-
-			Write-Host "`tConnected hosts :"
-			foreach ($connhost in $ConnectedHosts)
+			foreach ($DataStore in $AllDatastores)
 			{
-				Write-Host "`t`t" $connhost.Name
+				Write-Host
+				Write-Host "Found Datastore:" $DataStore.Name
+				Write-Host "`tState            : " $DataStore.state
+				Write-Host "`tDatastore Type   : " $DataStore.type
+#
+# These values return far too many decimal places. This technique limits the value displayed to two decimal places
+#
+				$RoundedCapacity = "{0:N2}" -f $DataStore.CapacityGB
+				Write-Host "`tCapacity (GB)    : " $RoundedCapacity
+				$RoundedFreeSpace = "{0:N2}" -f $DataStore.FreeSpaceGB
+				Write-Host "`tFree Space (GB)  : " $RoundedFreeSpace
+
+				$ConnectedHosts = Get-Datastore $DataStore | Get-VMHost
+
+				Write-Host "`tConnected hosts :"
+
+				foreach ($connhost in $ConnectedHosts)
+				{
+					Write-Host "`t`t" $connhost.Name
+				}
+				Write-Host
 			}
-			Write-Host
 		}
 	}
-}
 
 	Disconnect-VIServer * -Confirm:$false
 }
