@@ -51,7 +51,9 @@ Usage: kubectl vtopology <connect-args> <args>
 Advanced args
   -pv <pv_id>     - display vSphere storage details about a Persistent Volume
   -kn <node_name> - display vSphere VM details about a Kubernetes node
-  -sp <policy>    - display attributes of a particular SPBM storage policy
+  -sp <policy>    - display details of storage policy
+
+Note this tool requires PowerShell with PowerCLI, as well as kubectl
 ```
 
 ## Sample outputs:
@@ -75,8 +77,8 @@ Found DataCenter:  CH-Datacenter
                         Number of CPU     :  20
                         Total CPU (MHz)   :  43980
                         CPU Used (MHz)    :  13216
-                        Total Memory (GB) :  127.908458709716796875
-                        Memory Used (GB)  :  108.3525390625
+                        Total Memory (GB) :  127.90
+                        Memory Used (GB)  :  108.35
 
                 Found ESXi HOST:  esxi-dell-f.rainpole.com
 
@@ -89,8 +91,8 @@ Found DataCenter:  CH-Datacenter
                         Number of CPU     :  20
                         Total CPU (MHz)   :  43980
                         CPU Used (MHz)    :  6142
-                        Total Memory (GB) :  127.9084625244140625
-                        Memory Used (GB)  :  108.5263671875
+                        Total Memory (GB) :  127.90
+                        Memory Used (GB)  :  108.52
 
                 Found ESXi HOST:  esxi-dell-g.rainpole.com
 
@@ -103,8 +105,8 @@ Found DataCenter:  CH-Datacenter
                         Number of CPU     :  20
                         Total CPU (MHz)   :  43980
                         CPU Used (MHz)    :  1769
-                        Total Memory (GB) :  127.9084625244140625
-                        Memory Used (GB)  :  73.0107421875
+                        Total Memory (GB) :  127.95
+                        Memory Used (GB)  :  73.01
 
                 Found ESXi HOST:  esxi-dell-h.rainpole.com
 
@@ -117,8 +119,8 @@ Found DataCenter:  CH-Datacenter
                         Number of CPU     :  20
                         Total CPU (MHz)   :  43980
                         CPU Used (MHz)    :  2812
-                        Total Memory (GB) :  127.9084625244140625
-                        Memory Used (GB)  :  54.6357421875
+                        Total Memory (GB) :  127.90
+                        Memory Used (GB)  :  54.63
 
 ---
 
@@ -136,8 +138,8 @@ Kubernetes Node VM Name  :  k8s-master
         Number of CPU          :  4
         Cores per Socket       :  1
         Memory (GB)            :  4
-        Provisioned Space (GB) :  64.084197731688618659973144531
-        Used Space (GB)        :  16.166228981688618659973144531
+        Provisioned Space (GB) :  64.08
+        Used Space (GB)        :  16.16
 
 
 Kubernetes Node VM Name  :  k8s-worker1
@@ -150,8 +152,8 @@ Kubernetes Node VM Name  :  k8s-worker1
         Number of CPU          :  4
         Cores per Socket       :  1
         Memory (GB)            :  4
-        Provisioned Space (GB) :  66.084656844846904277801513672
-        Used Space (GB)        :  14.947938094846904277801513672
+        Provisioned Space (GB) :  66.08
+        Used Space (GB)        :  14.94
 
 
 Kubernetes Node VM Name  :  k8s-worker2
@@ -164,8 +166,8 @@ Kubernetes Node VM Name  :  k8s-worker2
         Number of CPU          :  4
         Cores per Socket       :  1
         Memory (GB)            :  4
-        Provisioned Space (GB) :  65.084641523659229278564453125
-        Used Space (GB)        :  14.959641523659229278564453125
+        Provisioned Space (GB) :  65.08
+        Used Space (GB)        :  14.95
        
 ---
 
