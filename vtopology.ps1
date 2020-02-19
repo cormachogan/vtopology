@@ -1,8 +1,7 @@
-#!/usr/bin/pwsh
+#! /usr/bin/pwsh
 #
-# Script to display some of the topology information from a vsphere cluster, using 
-# PowerShell and PowerCLI. Can be incorporated into krew for use directly with 
-# kubectl
+# Simple kubectl plugin which will display some of the topology 
+# information from a vsphere cluster, using PowerShell and PowerCLI
 #
 # Author: CJH - 20 August 2019
 #
@@ -12,23 +11,16 @@
 #
 # It has been tested on Ubuntu 17.04
 # 
-# For instructions on deploying PowerShell and PowerCLI on Ubuntu, please see:
+# For example deployment instructions on PowerShell and PowerCLI, please see:
 #
 # https://blog.inkubate.io/install-powershell-and-powercli-on-ubuntu-16-04/
 # - (although change the repo to 17.04)
-#
-# Note: I have been informed that this script will also run on MacOS/Darwin, but 
-# you will need to modiy the interpeter on line 1 of this script to point to the 
-# location of pwsh on your system
 #
 ####################################################################################
 #
 # Changes
 #
 # 1.0.1	Add support for query tags (datastores, datacenters, clusters, hosts)
-# 1.0.2 Display Storage Policies that could be used for StorageClasses in K8s
-# 1.0.3 Display if ESXi hosts are in a vSphere host group and if nodes are in a 
-#       vSphere VM group (supported by Enterprise PKS for AZ mapping)
 #
 ####################################################################################
 #
@@ -55,7 +47,6 @@ function usage()
         WRITE-HOST "  -n | --networks"
         WRITE-HOST "  -d | --datastores"
         WRITE-HOST "  -k | --k8svms"
-        WRITE-HOST "  -s | --spbm"
         WRITE-HOST "  -t | --tags"
         WRITE-HOST "  -a | --all"
         WRITE-HOST "  -h | --help"
@@ -63,7 +54,6 @@ function usage()
         WRITE-HOST "Advanced args"
         WRITE-HOST "  -pv <pv_id>     - display vSphere storage details about a Persistent Volume"
         WRITE-HOST "  -kn <node_name> - display vSphere VM details about a Kubernetes node"
-	WRITE-HOST "  -sp <policy>    - display details of storage policy"
         WRITE-HOST
         WRITE-HOST "Note this tool requires PowerShell with PowerCLI, as well as kubectl"
         WRITE-HOST
@@ -154,8 +144,8 @@ function get_hosts([string]$server, [string]$user, [string]$pwd)
 			{
 				Write-Host "`t`tFound ESXi HOST: " $ESXiHost.Name
 				Write-Host
-				Write-Host "`t`t`tvSphere Version   : "$ESXiHost.Version
-				Write-Host "`t`t`tBuild Number      : "$ESXiHost.Build
+				Write-Host "`t`t`tVersion           : "$ESXiHost.Version
+				Write-Host "`t`t`tBuild             : "$ESXiHost.Build
 				Write-Host "`t`t`tConnection State  : "$ESXiHost.ConnectionState
 				Write-Host "`t`t`tPower State       : "$ESXiHost.PowerState
 				Write-Host "`t`t`tManufacturer      : "$ESXiHost.Manufacturer
@@ -163,24 +153,9 @@ function get_hosts([string]$server, [string]$user, [string]$pwd)
 				Write-Host "`t`t`tNumber of CPU     : "$ESXiHost.NumCpu
 				Write-Host "`t`t`tTotal CPU (MHz)   : "$ESXiHost.CpuTotalMhz
 				Write-Host "`t`t`tCPU Used (MHz)    : "$ESXiHost.CpuUsageMhz
-#
-# These values return far too many decimal places. This technique limits the value displayed to two decimal places
-#
-				$RoundedTotalMemory = "{0:N2}" -f $ESXiHost.memoryTotalGB
-				Write-Host "`t`t`tTotal Memory (GB) : " $RoundedTotalMemory
-				$RoundedMemoryUsed = "{0:N2}" -f $ESXiHost.MemoryUsageGB
-				Write-Host "`t`t`tMemory Used (GB)  : " $RoundedMemoryUsed
+				Write-Host "`t`t`tTotal Memory (GB) : "$ESXiHost.memoryTotalGB
+				Write-Host "`t`t`tMemory Used (GB)  : "$ESXiHost.MemoryUsageGB
 				Write-Host
-#
-# 1.0.3 Host Group Information
-#
-				$hostGroupInfo = Get-DRSclusterGroup -VMHost $ESXiHost
-
-				foreach ($hostgroup in $hostGroupInfo)
-				{
-					Write-Host "`t`tESXi HOST" $ESXiHost.Name "is part of Host Group" $hostgroup.Name
-					Write-Host
-				}
 			}
 		}
 	}
@@ -237,24 +212,9 @@ function get_vms([string]$server, [string]$user, [string]$pwd)
 					Write-Host "`t`t`t`tFolder                 : "$VirtualMachine.Folder
 					Write-Host "`t`t`t`tNumber of CPU          : "$VirtualMachine.NumCpu
 					Write-Host "`t`t`t`tTotal Memory (GB)      : "$VirtualMachine.MemoryGB
-#
-# These values return far too many decimal places. This technique limits the value displayed to two decimal places
-#
-					$RoundedProvisionedSpaceGB = "{0:N2}" -f $VirtualMachine.ProvisionedSpaceGB
-					Write-Host "`t`t`t`tProvisioned Space (GB) : " $RoundedProvisionedSpaceGB
-					$RoundedUsedSpaceGB = "{0:N2}" -f $VirtualMachine.UsedSpaceGB
-					Write-Host "`t`t`t`tUsed Space (GB)        : " $RoundedUsedSpaceGB
+					Write-Host "`t`t`t`tProvisioned Space (GB) : "$VirtualMachine.ProvisionedSpaceGB
+					Write-Host "`t`t`t`tUsed Space (GB)        : "$VirtualMachine.UsedSpaceGB
 					Write-Host
-#
-# 1.0.3 VM/Host Group Information
-#
-					$VMGroupInfo = Get-DRSclusterGroup -VM $VirtualMachine
-
-					foreach ($vmgroup in $VMGroupInfo)
-					{
-						Write-Host "`t`t`tVirtual Machine" $VirtualMachine.Name "is part of VM/Host Group" $vmgroup.Name
-						Write-Host
-					}
 				}
 			}
 	
@@ -329,34 +289,28 @@ function get_datastores([string]$server, [string]$user, [string]$pwd)
 			Write-Host "`tFound Cluster: " $Cluster.Name
 			Write-Host
 
-			$AllDatastores = Get-Datastore -Location $DC
+		$AllDatastores = Get-Datastore -Location $DC
 
-			foreach ($DataStore in $AllDatastores)
+		foreach ($DataStore in $AllDatastores)
+		{
+			Write-Host
+			Write-Host "Found Datastore:" $DataStore.Name
+			Write-Host "`tState            : " $DataStore.state
+			Write-Host "`tDatastore Type   : " $DataStore.type
+			Write-Host "`tCapacity (GB)    : " $DataStore.CapacityGB
+			Write-Host "`tFree Space (GB)  : " $DataStore.FreeSpaceGB
+
+			$ConnectedHosts = Get-Datastore $DataStore | Get-VMHost
+
+			Write-Host "`tConnected hosts :"
+			foreach ($connhost in $ConnectedHosts)
 			{
-				Write-Host
-				Write-Host "Found Datastore:" $DataStore.Name
-				Write-Host "`tState            : " $DataStore.state
-				Write-Host "`tDatastore Type   : " $DataStore.type
-#
-# These values return far too many decimal places. This technique limits the value displayed to two decimal places
-#
-				$RoundedCapacity = "{0:N2}" -f $DataStore.CapacityGB
-				Write-Host "`tCapacity (GB)    : " $RoundedCapacity
-				$RoundedFreeSpace = "{0:N2}" -f $DataStore.FreeSpaceGB
-				Write-Host "`tFree Space (GB)  : " $RoundedFreeSpace
-
-				$ConnectedHosts = Get-Datastore $DataStore | Get-VMHost
-
-				Write-Host "`tConnected hosts :"
-
-				foreach ($connhost in $ConnectedHosts)
-				{
-					Write-Host "`t`t" $connhost.Name
-				}
-				Write-Host
+				Write-Host "`t`t" $connhost.Name
 			}
+			Write-Host
 		}
 	}
+}
 
 	Disconnect-VIServer * -Confirm:$false
 }
@@ -410,58 +364,11 @@ function get_k8s_node_info([string]$server, [string]$user, [string]$pwd, [string
 	Write-Host "`tNumber of CPU          : " $KVM.NumCpu
 	Write-Host "`tCores per Socket       : " $KVM.CoresPerSocket
 	Write-Host "`tMemory (GB)            : " $KVM.MemoryGB
-#
-# These values return far too many decimal places. This technique limits the value displayed to two decimal places
-#
-	$RoundedProvisionedSpaceGB = "{0:N2}" -f $KVM.ProvisionedSpaceGB
-	Write-Host "`tProvisioned Space (GB) : " $RoundedProvisionedSpaceGB
-	$RoundedUsedSpaceGB = "{0:N2}" -f $KVM.UsedSpaceGB
-	Write-Host "`tUsed Space (GB)        : " $RoundedUsedSpaceGB
+	Write-Host "`tProvisioned Space (GB) : " $KVM.ProvisionedSpaceGB
+	Write-Host "`tUsed Space (GB)        : " $KVM.UsedSpaceGB
 	Write-Host
-#
-# 1.0.3 VM/Host Group Information
-#
-	$KVMGroupInfo = Get-DRSclusterGroup -VM $KVM
-
-	foreach ($kvmgroup in $KVMGroupInfo)
-	{
-		Write-Host "`tVirtual Machine" $KVM.Name "is part of VM/Host Group" $kvmgroup.Name
-		Write-Host
-	}
 
 	Disconnect-VIServer * -Confirm:$false
-}
-
-
-#
-#######################################################################
-#
-# Get Storage Policies
-# Added to v1.0.2
-#
-#######################################################################
-#
-
-function get_spbm([string]$server, [string]$user, [string]$pwd)
-{
-
-	#Write-Host "Debug : vCenter Server $server"
-	#Write-Host "Debug : vCenter username $user"
-	#Write-Host "Debug : vCenter password $pwd"
-
-	$connected = Connect-VIServer $server -User $user -Password $pwd -force
-
-	Write-Host "*** These are Storage Policies in use on the vSphere Infrastructure which could potentially be used for Kuberenetes StorageClasses"
-	Write-Host
-
-	$AllPolicies = Get-SpbmStoragePolicy -Requirement -Server $server
-
-	foreach ($SPBM_Policy in $AllPolicies)
-	{
-		Write-Host "`tFound Policy:" $SPBM_Policy.Name
-	}
-	Write-Host
-
 }
 
 
@@ -477,9 +384,9 @@ function get_spbm([string]$server, [string]$user, [string]$pwd)
 function get_tags([string]$server, [string]$user, [string]$pwd)
 {
 
-	#Write-Host "Debug : vCenter Server $server"
-	#Write-Host "Debug : vCenter username $user"
-	#Write-Host "Debug : vCenter password $pwd"
+	#Write-Host "Debug GH: vCenter Server $server"
+	#Write-Host "Debug GH: vCenter username $user"
+	#Write-Host "Debug GH: vCenter password $pwd"
 
 	$connected = Connect-VIServer $server -User $user -Password $pwd -force
 
@@ -589,6 +496,7 @@ function get_k8svms([string]$server, [string]$user, [string]$pwd)
 #
 # -- slowest part of script - need to find a better way of finding the VM
 #
+			#$K8SVMS = Get-VM -NoRecursion | where { $_.Guest.IPAddress -match $IPAddress } 
 			$K8SVMS = Get-VM -NoRecursion | where { $_.Guest.IPAddress -eq $IPAddress } 
 
 			foreach ($KVM in $K8SVMS)
@@ -604,58 +512,14 @@ function get_k8svms([string]$server, [string]$user, [string]$pwd)
 				Write-Host "`tNumber of CPU          : " $KVM.NumCpu
 				Write-Host "`tCores per Socket       : " $KVM.CoresPerSocket
 				Write-Host "`tMemory (GB)            : " $KVM.MemoryGB
-#
-# These values return far too many decimal places. This technique limits the value displayed to two decimal places
-#
-				$RoundedProvisionedSpaceGB = "{0:N2}" -f $KVM.ProvisionedSpaceGB
-				Write-Host "`tProvisioned Space (GB) : " $RoundedProvisionedSpaceGB
-				$RoundedUsedSpaceGB = "{0:N2}" -f $KVM.UsedSpaceGB
-				Write-Host "`tUsed Space (GB)        : " $RoundedUsedSpaceGB
+				Write-Host "`tProvisioned Space (GB) : " $KVM.ProvisionedSpaceGB
+				Write-Host "`tUsed Space (GB)        : " $KVM.UsedSpaceGB
 				Write-Host
-#
-# 1.0.3 VM/Host Group Information
-#
-				$KVMGroupInfo = Get-DRSclusterGroup -VM $KVM
-
-				foreach ($kvmgroup in $KVMGroupInfo)
-				{
-					Write-Host "`tVirtual Machine" $KVM.Name "is part of VM/Host Group" $kvmgroup.Name
-					Write-Host
-				}
 			}
 		}
 	}
 
 	Disconnect-VIServer * -Confirm:$false
-}
-
-
-#######################################################################
-#
-# Get individual SPBM Policy Info
-# Added to v1.0.2
-#
-#######################################################################
-
-function get_sp_info([string]$server, [string]$user, [string]$pwd, [string]$policyname)
-{
-
-	#Write-Host "Debug GH: vCenter Server $server"
-	#Write-Host "Debug GH: vCenter username $user"
-	#Write-Host "Debug GH: vCenter password $pwd"
-
-	$connected = Connect-VIServer $server -User $user -Password $pwd -force
-
-	WRITE-HOST "Display Detailed Policy attributes of:" $policyname
-	WRITE-HOST
-
-	$AllAttributes = Get-SpbmStoragePolicy $policyname 
-
-	foreach ($Attribute in $AllAttributes)
-	{
-		WRITE-HOST "`tFound Policy Attribute :" $Attribute.AnyOfRuleSets
-	}
-	WRITE-HOST
 }
 
 
@@ -677,7 +541,7 @@ function get_pv_info([string]$server, [string]$user, [string]$pwd, [string]$pvid
 #
 #######################################################################
 #
-# First, verify this is a vSphere(VCP) or CSI volume
+# First, verify this is a vSphere volume
 #
 #######################################################################
 #
@@ -841,8 +705,6 @@ function get_all([string]$server, [string]$user, [string]$pwd)
 	get_k8svms $vcenter_server $v_username $v_password
 	Write-Host "=== vSphere Tags ==="
 	get_tags $vcenter_server $v_username $v_password
-	Write-Host "=== Storage Policies ==="
-	get_spbm $vcenter_server $v_username $v_password
 }
 
 ######################################################################
@@ -869,9 +731,7 @@ else
 
 		Write-Host
 		$Context = & kubectl config current-context
-		Write-Host "*** This command is being run against the following Kubernetes configuration context:" $Context
-		Write-Host
-		Write-Host "*** To switch to another context, use the kubectl config use-context command ***"
+		Write-Host "*** This command is being run against the following Kubernetes configuration context: " $Context
 		Write-Host
 
 		
@@ -903,11 +763,6 @@ else
 							$vcenter_server, $v_username, $v_password = vc_login
 							get_k8svms $vcenter_server $v_username $v_password ; break 
 						}
-                	{$_ -in '-s', '--spbm'} 
-						{ 
-							$vcenter_server, $v_username, $v_password = vc_login
-							get_spbm $vcenter_server $v_username $v_password ; break 
-						}
                 	{$_ -in '-t', '--tags'} 
 						{ 
 							$vcenter_server, $v_username, $v_password = vc_login
@@ -919,20 +774,6 @@ else
 							get_all $vcenter_server $v_username $v_password ; break
 						}
                 	{$_ -in '-h', '--help'} { usage }
-                	'-sp'{
-                       	 		# Check that Policy Name was supplied
-                       	 		if ( !$args[1] )
-                       	 		{
-                       	       			Write-Host "No Policy Name supplied - please provide the Policy Name after -sp"
-                       	       			Write-Host "The Policy Names can be found by running this tool with the -s|--spbm option"
-                       	       			Write-Host
-					}
-                       	 		else
-					{ 
-						$vcenter_server, $v_username, $v_password = vc_login
-						get_sp_info $vcenter_server $v_username $v_password $args[1] ; break 
-					}
-				}
                 	'-pv'{
                        	 		# Check that PV ID was supplied
                        	 		if ( !$args[1] )
@@ -977,8 +818,6 @@ else
 		Write-Host
 		$Context = & kubectl config current-context
 		Write-Host "*** This command is being run against the following Kubernetes configuration context: " $Context
-		Write-Host
-		Write-Host "*** To switch to another context, use the kubectl config use-context command ***"
 		Write-Host
 
 #
@@ -1058,24 +897,9 @@ else
                 	{$_ -in '-n', '--networks'} { get_networks $vcenter_server $v_username $v_password ; break }
                 	{$_ -in '-d', '--datastores'} { get_datastores $vcenter_server $v_username $v_password ; break }
                 	{$_ -in '-k', '--k8svms'} { get_k8svms $vcenter_server $v_username $v_password ; break }
-                	{$_ -in '-s', '--spbm'} { get_spbm $vcenter_server $v_username $v_password ; break }
                 	{$_ -in '-t', '--tags'} { get_tags $vcenter_server $v_username $v_password ; break }
                 	{$_ -in '-a', '--all'} { get_all $vcenter_server $v_username $v_password ; break }
                 	{$_ -in '-h', '--help'} { usage }
-                	 '-sp'{
-                       	 		# Check that Policy Name was supplied
-                       	 		if ( !$args[7] )
-                       	 		{
-                       	       			Write-Host "No Policy Name supplied - please provide the Policy Name after -sp"
-                       	       			Write-Host "The Policy Name can be found by running this tool with the -s|--spbm option"
-                       	       			Write-Host
-					}
-                       	 		else
-					{ 
-						#Write-Host "Debug: SPBM - vCenter Server $vcenter_server $args[7]"
-						get_sp_info $vcenter_server $v_username $v_password $args[7] ;break 
-					}
-			      }
                 	 '-pv'{
                        	 		# Check that PV ID was supplied
                        	 		if ( !$args[7] )
