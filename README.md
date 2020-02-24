@@ -44,6 +44,7 @@ Usage: kubectl vtopology <connect-args> <args>
   -d | --datastores
   -k | --k8svms
   -s | --spbm
+  -o | --orphanpvs
   -t | --tags
   -a | --all
   -h | --help
@@ -53,7 +54,7 @@ Advanced args
   -kn <node_name> - display vSphere VM details about a Kubernetes node
   -sp <policy>    - display details of storage policy
 
-Note this tool requires PowerShell with PowerCLI, as well as kubectl
+Note this tool requires PowerShell with PowerCLI, kubectl and awk
 ```
 
 ## Sample outputs:
@@ -171,32 +172,42 @@ Kubernetes Node VM Name  :  k8s-worker2
        
 ---
 
-$ kubectl vtopology -vc 1.2.3.4 -u administrator@vsphere.local -p password -pv pvc-0cc1a552-c2a5-11e9-80e4-005056a239d9
+$ kubectl vtopology -vc 1.2.3.4 -u administrator@vsphere.local -p password -pv pvc-f721b470-d312-40a6-9f0b-a6f18f806b8f
 
-*** This command is being run against the following Kubernetes configuration context:  kubernetes-admin@kubernetes
+*** This command is being run against the following Kubernetes configuration context:  kubernetes
 
-
-=== vSphere Datastore information for PV pvc-0cc1a552-c2a5-11e9-80e4-005056a239d9 ===
-
-        Datastore Name     :  vsanDatastore
-        Datastore State    :  Available
-        Datastore Type     :  vsan
-        Capacity (GB)      :  5961.625
-        Free Space (GB)    :  3165.875
+*** To switch to another context, use the kubectl config use-context command ***
 
 
-=== Virtual Machine Disk (VMDK) information for PV pvc-0cc1a552-c2a5-11e9-80e4-005056a239d9 ===
+=== vSphere Datastore information for PV pvc-f721b470-d312-40a6-9f0b-a6f18f806b8f ===
 
-        VMDK Name          :  520a080ca1f54de2861cca3e0836b253.vmdk
+        Datastore Name            :  vmfs-datastore
+        Datastore State           :  Available
+        Datastore Type            :  VMFS
+        Datastore Capacity (GB)   :  511,999.25
+        Datastore Free Space (GB) :  511,942.26
+
+
+=== Virtual Machine Disk (VMDK) information for PV pvc-f721b470-d312-40a6-9f0b-a6f18f806b8f ===
+
+        VMDK Name          :  2b40ba861a174415aacd0feed5ee73c2.vmdk
         VMDK Type          :  Flat
         VMDK Capacity (GB) :  1
-        VMDK Filename      :  [vsanDatastore] 33d05a5d-e436-3297-94f7-246e962f4910/520a080ca1f54de2861cca3e0836b253.vmdk
+        VMDK Filename      :  [vmfs-datastore] fcd/2b40ba861a174415aacd0feed5ee73c2.vmdk
 
 
-=== Storage Policy (SPBM) information for PV pvc-0cc1a552-c2a5-11e9-80e4-005056a239d9 ===
+=== Storage Policy (SPBM) information for PV pvc-f721b470-d312-40a6-9f0b-a6f18f806b8f ===
 
-        Kubernetes VM/Node :  k8s-worker1
+        Kubernetes VM/Node :  k8s-worker-02
         Hard Disk Name     :  Hard disk 2
-        Policy Name        :  Space-Efficient
+        Policy Name        :  PureStorage
         Policy Compliance  :  compliant
+
+
+=== Application (Pod) information for PV pvc-f721b470-d312-40a6-9f0b-a6f18f806b8f ===
+
+        Persistent Volume       :  pvc-f721b470-d312-40a6-9f0b-a6f18f806b8f
+        Persistent Volume Claim :  cassandra-csi-data-cassandra-1
+        Used by Pod             :  cassandra-1
+        Attached to K8s Node    :  k8s-worker-02
 ```
