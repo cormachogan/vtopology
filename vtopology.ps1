@@ -31,6 +31,7 @@
 #       vSphere VM group (supported by Enterprise PKS for AZ mapping)
 # 1.0.4 Add DC and Cluster information to K8s Node outputs
 # 1.0.5 Report Pod (if any) using PV/PVC - help to find orphaned PVs
+# 1.0.6 Option to report all disconnected/orphaned PVs
 #
 ####################################################################################
 #
@@ -47,7 +48,7 @@ Set-PowerCLIConfiguration -DisplayDeprecationWarnings $false -confirm:$false > /
 function usage()
 {
 	WRITE-HOST
-	WRITE-HOST "*** vTopology version 1.0.5 ***"
+	WRITE-HOST "*** vTopology version 1.0.6 ***"
 	WRITE-HOST
         WRITE-HOST "Usage: kubectl vtopology <connect-args> <args>"
 	WRITE-HOST
@@ -63,6 +64,7 @@ function usage()
         WRITE-HOST "  -d | --datastores"
         WRITE-HOST "  -k | --k8svms"
         WRITE-HOST "  -s | --spbm"
+        WRITE-HOST "  -o | --orphanpvs"
         WRITE-HOST "  -t | --tags"
         WRITE-HOST "  -a | --all"
         WRITE-HOST "  -h | --help"
@@ -487,6 +489,150 @@ function get_spbm([string]$server, [string]$user, [string]$pwd)
 }
 
 
+
+#
+#######################################################################
+#
+# Get Ophaned PVs - PVs not connected to any Pods/K8s worker nodes
+# Added to v1.0.6
+#
+#######################################################################
+#
+
+function get_orphanpvs([string]$server, [string]$user, [string]$pwd)
+{
+
+	#Write-Host "Debug : vCenter Server $server"
+	#Write-Host "Debug : vCenter username $user"
+	#Write-Host "Debug : vCenter password $pwd"
+
+	$connected = Connect-VIServer $server -User $user -Password $pwd -force
+
+###########################################################################################
+#
+#-- Determine if there are any PVs that are not attached to Pods (i.e. orphans)
+#
+###########################################################################################
+
+	Write-Host
+	Write-Host "=== Check for orphaned PVs not attached to Pods ==="
+
+	$pv_list = & kubectl get pv --no-headers |  awk '{print $6}'
+
+	$found_orphans = 0
+
+	foreach ($claim in $pv_list)
+	{
+
+		#Write-Host
+		#Write-Host "DEBUG : Persistent Volume Claim $claim"
+		#Write-Host
+
+		$claim_details = $claim -split "/"
+		$pvc_namespace =  $claim_details[0]
+		$pvc_pv =  $claim_details[1]
+
+###########################################################################################
+#
+#-- Check that we an find the namespace and claim
+#
+###########################################################################################
+
+		#Write-Host "DEBUG : Persistent Volume Namespace: $pvc_namespace"
+		#Write-Host "DEBUG : Persistent Volume Claim: $pvc_pv"
+		#Write-Host
+
+		$isMounted = & kubectl describe pvc  $pvc_pv -n $pvc_namespace | grep "Mounted By:" | awk -F: '{print $2}'
+
+###########################################################################################
+#
+#-- Clean up blank spaces
+#
+###########################################################################################
+
+		$isMounted = $isMounted -replace '\s',''
+
+###########################################################################################
+#
+#-- Check that we an find the Pod mounting the PV. <none> implies no Pod
+#
+###########################################################################################
+
+		if ( $isMounted -ne "<none>" )
+		{
+			#Write-Host "DEBUG : Persistent Volume Pod: $isMounted"
+			#Write-Host
+
+###########################################################################################
+#
+#-- Display node where Pod is running
+#
+###########################################################################################
+
+			$pod_node = & kubectl describe pod $isMounted -n $pvc_namespace | grep Node: | awk -F: '{print $2}'
+
+###########################################################################################
+#
+#-- Clean up blank spaces
+#
+###########################################################################################
+
+			$pod_node = $pod_node  -replace '\s',''
+
+			#Write-Host "DEBUG : Persistent Volume Pod Node: $pod_node"
+			#Write-Host
+
+			$node_details = $pod_node -split "/"
+			$pod_node_name =  $node_details[0]
+			$pod_node_ip =  $node_details[1]
+
+			#Write-Host
+			#Write-Host "DEBUG: Persistent Volume Claim : " $pvc_pv
+			#Write-Host "DEBUG: Used by Pod             : " $isMounted
+			#Write-Host "DEBUG: Attached to K8s Node    : " $pod_node_name
+
+###########################################################################################
+#
+#-- For PKS, K8s Node Name is different to VM Name. Handle that difference here
+#
+###########################################################################################
+
+			$KVM = Get-VM -NoRecursion | where { $_.Guest.IPAddress -eq $pod_node_ip } 
+
+			if ( $KVM.Name -ne $pod_node_name )
+			{
+				#Write-Host "DEBUG: Attached to VM          : " $KVM.Name
+			}
+			#Write-Host
+		}
+		else
+		{
+			Write-Host
+			Write-Host "`tPVC $pvc_pv does not appear to be mounted by any Pod..."
+			Write-Host
+			$found_orphans = $found_orphans + 1
+		}
+	}
+	
+	if ( $found_orphans -eq 0 )
+	{
+		Write-Host
+		Write-Host "`tNo orphaned PVs found in this cluster."
+		Write-Host
+	}	
+	else
+	{
+		Write-Host
+		Write-Host "`tA total of $found_orphans orphaned PVs were found in this cluster."
+		Write-Host
+	}
+
+	Disconnect-VIServer * -Confirm:$false
+}
+
+
+
+
 #
 #######################################################################
 #
@@ -750,9 +896,11 @@ function get_pv_info([string]$server, [string]$user, [string]$pwd, [string]$pvid
 #######################################################################
 #
 
+###########################################################################################
 #
 #-- 1. Datastore info
 #
+###########################################################################################
 
 	Write-Host
         Write-Host "=== vSphere Datastore information for PV $pvid ==="
@@ -779,9 +927,13 @@ function get_pv_info([string]$server, [string]$user, [string]$pwd, [string]$pvid
                 Write-Host "`tDatastore Free Space (GB) : " $RoundedFreeSpaceGB
 		Write-Host
 	}
+
+###########################################################################################
 #
 #-- 2. VMDK info
 #
+###########################################################################################
+
 	Write-Host
         Write-Host "=== Virtual Machine Disk (VMDK) information for PV $pvid ==="
 
@@ -804,9 +956,11 @@ function get_pv_info([string]$server, [string]$user, [string]$pwd, [string]$pvid
 		Write-Host
 	}
 
+###########################################################################################
 #
 #-- 3. Policy Info
 #
+###########################################################################################
 
 	Write-Host
         Write-Host "=== Storage Policy (SPBM) information for PV $pvid ==="
@@ -842,9 +996,12 @@ function get_pv_info([string]$server, [string]$user, [string]$pwd, [string]$pvid
 			Write-Host
 		}
 	}
+
+###########################################################################################
 #
-# If PV is detached from Node, then we cannot get policy info - handle that.
+# If PV is detached from Node, then we cannot get policy info - handle that. (v1.0.5)
 #
+###########################################################################################
 
 	if ( $PV_POLICY -eq $null )
 	{
@@ -852,9 +1009,11 @@ function get_pv_info([string]$server, [string]$user, [string]$pwd, [string]$pvid
 		Write-Host "`tVMDK $pv_volpath does not appear to be attached to any K8s node - cannot retrive storage policy information..."
 	}
 
+###########################################################################################
 #
 #-- 4. Application info (which Pod?, is it mounted?, which K8s node is the Pod running on?)
 #
+###########################################################################################
 
 	Write-Host
 	Write-Host "=== Application (Pod) information for PV $pvid ==="
@@ -869,9 +1028,11 @@ function get_pv_info([string]$server, [string]$user, [string]$pwd, [string]$pvid
 	$pvc_namespace =  $claim_details[0]
 	$pvc_pv =  $claim_details[1]
 
+###########################################################################################
 #
 #-- Check that we an find the namespace and claim
 #
+###########################################################################################
 
 	#Write-Host "DEBUG : Persistent Volume Namespace: $pvc_namespace"
 	#Write-Host "DEBUG : Persistent Volume Claim: $pvc_pv"
@@ -879,31 +1040,39 @@ function get_pv_info([string]$server, [string]$user, [string]$pwd, [string]$pvid
 
 	$isMounted = & kubectl describe pvc  $pvc_pv -n $pvc_namespace | grep "Mounted By:" | awk -F: '{print $2}'
 
-
+###########################################################################################
 #
 #-- Clean up blank spaces
 #
+###########################################################################################
+
 	$isMounted = $isMounted -replace '\s',''
 
-
+###########################################################################################
 #
 #-- Check that we an find the Pod mounting the PV. <none> implies no Pod
 #
+###########################################################################################
 
 	if ( $isMounted -ne "<none>" )
 	{
 		#Write-Host "DEBUG : Persistent Volume Pod: $isMounted"
 		#Write-Host
 
+###########################################################################################
 #
 #-- Display node where Pod is running
 #
+###########################################################################################
 
-		$pod_node = & kubectl describe pod cassandra-0 -n cassandra | grep Node: | awk -F: '{print $2}'
+		$pod_node = & kubectl describe pod $isMounted -n $pvc_namespace | grep Node: | awk -F: '{print $2}'
 
+###########################################################################################
 #
 #-- Clean up blank spaces
 #
+###########################################################################################
+
 		$pod_node = $pod_node  -replace '\s',''
 
 		#Write-Host "DEBUG : Persistent Volume Pod Node: $pod_node"
@@ -918,9 +1087,13 @@ function get_pv_info([string]$server, [string]$user, [string]$pwd, [string]$pvid
 		Write-Host "`tPersistent Volume Claim : " $pvc_pv
 		Write-Host "`tUsed by Pod             : " $isMounted
 		Write-Host "`tAttached to K8s Node    : " $pod_node_name
+
+###########################################################################################
 #
 #-- For PKS, K8s Node Name is different to VM Name. Handle that difference here
 #
+###########################################################################################
+
 		$KVM = Get-VM -NoRecursion | where { $_.Guest.IPAddress -eq $pod_node_ip } 
 
 		if ( $KVM.Name -ne $pod_node_name )
@@ -1036,6 +1209,11 @@ else
 						{ 
 							$vcenter_server, $v_username, $v_password = vc_login
 							get_spbm $vcenter_server $v_username $v_password ; break 
+						}
+                	{$_ -in '-o', '--orphanpvs'} 
+						{ 
+							$vcenter_server, $v_username, $v_password = vc_login
+							get_orphanpvs $vcenter_server $v_username $v_password ; break 
 						}
                 	{$_ -in '-t', '--tags'} 
 						{ 
@@ -1191,6 +1369,7 @@ else
                 	{$_ -in '-d', '--datastores'} { get_datastores $vcenter_server $v_username $v_password ; break }
                 	{$_ -in '-k', '--k8svms'} { get_k8svms $vcenter_server $v_username $v_password ; break }
                 	{$_ -in '-s', '--spbm'} { get_spbm $vcenter_server $v_username $v_password ; break }
+                	{$_ -in '-o', '--orphanpvs'} { get_orphanpvs $vcenter_server $v_username $v_password ; break }
                 	{$_ -in '-t', '--tags'} { get_tags $vcenter_server $v_username $v_password ; break }
                 	{$_ -in '-a', '--all'} { get_all $vcenter_server $v_username $v_password ; break }
                 	{$_ -in '-h', '--help'} { usage }
