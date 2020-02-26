@@ -32,6 +32,7 @@
 # 1.0.4 Add DC and Cluster information to K8s Node outputs
 # 1.0.5 Report Pod (if any) using PV/PVC - help to find orphaned PVs
 # 1.0.6 Option to report all disconnected/orphaned PVs
+# 1.0.7 Add Namespace to PV output
 #
 ####################################################################################
 #
@@ -588,6 +589,7 @@ function get_orphanpvs([string]$server, [string]$user, [string]$pwd)
 
 			#Write-Host
 			#Write-Host "DEBUG: Persistent Volume Claim : " $pvc_pv
+			#Write-Host "DEBUG: Namespace               : " $pvc_namespace
 			#Write-Host "DEBUG: Used by Pod             : " $isMounted
 			#Write-Host "DEBUG: Attached to K8s Node    : " $pod_node_name
 
@@ -1085,6 +1087,14 @@ function get_pv_info([string]$server, [string]$user, [string]$pwd, [string]$pvid
 		Write-Host
 		Write-Host "`tPersistent Volume       : " $pvid
 		Write-Host "`tPersistent Volume Claim : " $pvc_pv
+
+###########################################################################################
+#
+#-- v1.0.7 Display Namespacee (FR from FG)
+#
+###########################################################################################
+
+		Write-Host "`tNamespace               : " $pvc_namespace
 		Write-Host "`tUsed by Pod             : " $isMounted
 		Write-Host "`tAttached to K8s Node    : " $pod_node_name
 

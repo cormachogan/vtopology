@@ -3,13 +3,13 @@ kind: Plugin
 metadata:
   name: vtopology
 spec:
-  version: "v1.0.6"
+  version: "v1.0.7"
   platforms:
   - selector:
       matchExpressions:
       - {key: os, operator: In, values: [linux]}
     uri: ./vtopology.tar.gz
-    sha256: "7803959d7999d6936e27e3fdeb1403cb283e191e56f1606f3b85f5ecb8be6a1a"
+    sha256: "f7b8c979ac98bcba641f5864f3d79be4ae91e370adf30755a8c8464e8ee1d855"
     files:
     - from: "/*.ps1"
       to: "."     
@@ -17,7 +17,7 @@ spec:
   shortDescription: Prints the vSphere topology
   caveats: |
     This plugin needs the following programs:
-    * PowerShell, PowerCLI and kubectl
+    * PowerShell, PowerCLI, kubectl and awk
   description: |
     This plugin shows underlying vSphere infrastructure details
     when Kubernetes is running on vSphere. Use the -h | --help
