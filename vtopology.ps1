@@ -33,6 +33,7 @@
 # 1.0.5 Report Pod (if any) using PV/PVC - help to find orphaned PVs
 # 1.0.6 Option to report all disconnected/orphaned PVs
 # 1.0.7 Add Namespace to PV output
+# 1.0.8 Better error handling to ensure context and vCenter match
 #
 ####################################################################################
 #
@@ -396,62 +397,87 @@ function get_k8s_node_info([string]$server, [string]$user, [string]$pwd, [string
 
 	$connected = Connect-VIServer $server -User $user -Password $pwd -force
 
+#################################################################################################
 #
-#######################################################################
+# There is no way to verify this is a virtual machine on vSphere, as opposed to bare metal, etc.
+# We will just have to assume that it is, and handle it if we can't find it
 #
-# There is no way to verify this is a virtual machine on vSphere
-# We will just have to assume that it is
-#
-#######################################################################
-#
+##################################################################################################
 
         $IPAddress = & kubectl get nodes $nodeid  -o wide --no-headers | awk '{print $7}'
 
         #Write-Host "DEBUG: K8s Node External IP:    $IPAddress"
 
+#########################################################################
 #
 # -- slowest part of script - need to find a better way of finding the VM
 #
+#########################################################################
 
 	#$KVM = Get-VM -NoRecursion | where { $_.Guest.IPAddress -match $IPAddress } 
 	$KVM = Get-VM -NoRecursion | where { $_.Guest.IPAddress -eq $IPAddress } 
 
+#########################################################################
+#
+#-- v1.0.8 Make sure we are on the correct VC for this K8s node
+#
+#########################################################################
 
-	Write-Host
-	Write-Host "Kubernetes Node Name     : " $nodeid
-	Write-Host
-	Write-Host "`tVirtual Machine Name   : " $KVM.Name
-	Write-Host "`tIP Address             : " $IPAddress
-	Write-Host "`tPower State            : " $KVM.PowerState
-	Write-Host "`tOn ESXi host           : " $KVM.VMHost
+	if ( $KVM -eq $null )
+	{
+		Write-Host
+		Write-Host "Error: Unable to find Virtual Machine matching Kubernetes Node --- $nodeid --- with IP Address $IPAddress"
+		Write-Host "Verify that Kubernetes cluster --- $context --- is running on infrastructure managed by vCenter $server"
+		Write-Host
+		exit
+	}
+	else
+	{
+		Write-Host
+		Write-Host "Kubernetes Node Name     : " $nodeid
+		Write-Host
+		Write-Host "`tVirtual Machine Name   : " $KVM.Name
+		Write-Host "`tIP Address             : " $IPAddress
+		Write-Host "`tPower State            : " $KVM.PowerState
+		Write-Host "`tOn ESXi host           : " $KVM.VMHost
+	
+		$KNodeDC = Get-Datacenter -VMHost $KVM.VMHost
+		$KNodeCluster = Get-Cluster -VMHost $KVM.VMHost
+	
+		Write-Host "`tOn Cluster             : " $KNodeDC.Name
+		Write-Host "`tOn Datacenter          : " $KNodeCluster.Name
+		Write-Host "`tFolder                 : " $KVM.GuestId
+		Write-Host "`tHardware Version       : " $KVM.HardwareVersion
+		Write-Host "`tNumber of CPU          : " $KVM.NumCpu
+		Write-Host "`tCores per Socket       : " $KVM.CoresPerSocket
+		Write-Host "`tMemory (GB)            : " $KVM.MemoryGB
 
-	$KNodeDC = Get-Datacenter -VMHost $KVM.VMHost
-	$KNodeCluster = Get-Cluster -VMHost $KVM.VMHost
-
-	Write-Host "`tOn Cluster             : " $KNodeDC.Name
-	Write-Host "`tOn Datacenter          : " $KNodeCluster.Name
-	Write-Host "`tFolder                 : " $KVM.GuestId
-	Write-Host "`tHardware Version       : " $KVM.HardwareVersion
-	Write-Host "`tNumber of CPU          : " $KVM.NumCpu
-	Write-Host "`tCores per Socket       : " $KVM.CoresPerSocket
-	Write-Host "`tMemory (GB)            : " $KVM.MemoryGB
+##################################################################################################################
 #
 # These values return far too many decimal places. This technique limits the value displayed to two decimal places
 #
-	$RoundedProvisionedSpaceGB = "{0:N2}" -f $KVM.ProvisionedSpaceGB
-	Write-Host "`tProvisioned Space (GB) : " $RoundedProvisionedSpaceGB
-	$RoundedUsedSpaceGB = "{0:N2}" -f $KVM.UsedSpaceGB
-	Write-Host "`tUsed Space (GB)        : " $RoundedUsedSpaceGB
-	Write-Host
-#
-# 1.0.3 VM/Host Group Information
-#
-	$KVMGroupInfo = Get-DRSclusterGroup -VM $KVM
+##################################################################################################################
 
-	foreach ($kvmgroup in $KVMGroupInfo)
-	{
-		Write-Host "`tVirtual Machine" $KVM.Name "is part of VM/Host Group" $kvmgroup.Name
+		$RoundedProvisionedSpaceGB = "{0:N2}" -f $KVM.ProvisionedSpaceGB
+		Write-Host "`tProvisioned Space (GB) : " $RoundedProvisionedSpaceGB
+
+		$RoundedUsedSpaceGB = "{0:N2}" -f $KVM.UsedSpaceGB
+		Write-Host "`tUsed Space (GB)        : " $RoundedUsedSpaceGB
 		Write-Host
+
+##################################################################################################################
+#
+#-- v1.0.3 VM/Host Group Information - possibly used as Availability Zones for a K8s cluster. Useful to show.
+#
+##################################################################################################################
+
+		$KVMGroupInfo = Get-DRSclusterGroup -VM $KVM
+
+		foreach ($kvmgroup in $KVMGroupInfo)
+		{
+			Write-Host "`tVirtual Machine" $KVM.Name "is part of VM/Host Group" $kvmgroup.Name
+			Write-Host
+		}
 	}
 
 	Disconnect-VIServer * -Confirm:$false
@@ -461,8 +487,7 @@ function get_k8s_node_info([string]$server, [string]$user, [string]$pwd, [string
 #
 #######################################################################
 #
-# Get Storage Policies
-# Added to v1.0.2
+#-- v1.0.2 Get Storage Policies
 #
 #######################################################################
 #
@@ -476,7 +501,8 @@ function get_spbm([string]$server, [string]$user, [string]$pwd)
 
 	$connected = Connect-VIServer $server -User $user -Password $pwd -force
 
-	Write-Host "*** These are Storage Policies in use on the vSphere Infrastructure which could potentially be used for Kuberenetes StorageClasses"
+	Write-Host "*** These are the Storage Policies defined on vCenter $server ***"
+	Write-Host "*** The policies could be used as Storage Classes by any K8s cluster running in this environment ***"
 	Write-Host
 
 	$AllPolicies = Get-SpbmStoragePolicy -Requirement -Server $server
@@ -615,6 +641,12 @@ function get_orphanpvs([string]$server, [string]$user, [string]$pwd)
 			$found_orphans = $found_orphans + 1
 		}
 	}
+
+###############################################################################################
+#
+#--If we don't have any orphans, lets report that as well instead of just finishing silently
+#
+###############################################################################################
 	
 	if ( $found_orphans -eq 0 )
 	{
@@ -749,6 +781,14 @@ function get_k8svms([string]$server, [string]$user, [string]$pwd)
 
 	$connected = Connect-VIServer $server -User $user -Password $pwd -force
 
+#########################################################################
+#
+#-- v1.0.8 - Make sure we are looking at the correct VC for our K8s context
+#
+#########################################################################
+
+	$node_count = 0
+
 	$K8SVMIPS = & kubectl get nodes -o wide | awk '{print $7}'
 
 	foreach ($IPAddress in $K8SVMIPS)
@@ -756,9 +796,13 @@ function get_k8svms([string]$server, [string]$user, [string]$pwd)
 		if ($IPAddress -NotMatch "EXTERNAL")
 		{
 			#Write-Host "DEBUG: K8s node with EXTERNAL $IPAddress found"
+
+#########################################################################
 #
 # -- slowest part of script - need to find a better way of finding the VM
 #
+#########################################################################
+
 			$K8SVMS = Get-VM -NoRecursion | where { $_.Guest.IPAddress -eq $IPAddress } 
 
 
@@ -781,17 +825,25 @@ function get_k8svms([string]$server, [string]$user, [string]$pwd)
 				Write-Host "`tNumber of CPU          : " $KVM.NumCpu
 				Write-Host "`tCores per Socket       : " $KVM.CoresPerSocket
 				Write-Host "`tMemory (GB)            : " $KVM.MemoryGB
+
+####################################################################################################################
 #
 # These values return far too many decimal places. This technique limits the value displayed to two decimal places
 #
+####################################################################################################################
+
 				$RoundedProvisionedSpaceGB = "{0:N2}" -f $KVM.ProvisionedSpaceGB
 				Write-Host "`tProvisioned Space (GB) : " $RoundedProvisionedSpaceGB
 				$RoundedUsedSpaceGB = "{0:N2}" -f $KVM.UsedSpaceGB
 				Write-Host "`tUsed Space (GB)        : " $RoundedUsedSpaceGB
 				Write-Host
+
+####################################################################################################################
 #
-# 1.0.3 VM/Host Group Information
+#-- v1.0.3 VM/Host Group Information
 #
+####################################################################################################################
+
 				$KVMGroupInfo = Get-DRSclusterGroup -VM $KVM
 
 				foreach ($kvmgroup in $KVMGroupInfo)
@@ -799,9 +851,24 @@ function get_k8svms([string]$server, [string]$user, [string]$pwd)
 					Write-Host "`tVirtual Machine" $KVM.Name "is part of VM/Host Group" $kvmgroup.Name
 					Write-Host
 				}
+
+				$node_count = $node_count + 1
 			}
 		}
 	}
+
+###############################################################################################
+#
+#-- v1.0.8 If we don't find any nodes, lets suggest that this is the wrong vCenter/Context
+#
+###############################################################################################
+	
+	if ( $node_count -eq 0 )
+	{
+		Write-Host "Error: No nodes were discovered"
+		Write-Host "Verify that Kubernetes cluster --- $context --- is running on infrastructure managed by vCenter $server"
+		Write-Host
+	}	
 
 	Disconnect-VIServer * -Confirm:$false
 }
@@ -900,19 +967,20 @@ function get_pv_info([string]$server, [string]$user, [string]$pwd, [string]$pvid
 
 ###########################################################################################
 #
-#-- 1. Datastore info
+#-- 1. Datastore info (include fix v1.0.8)
 #
 ###########################################################################################
 
 	Write-Host
         Write-Host "=== vSphere Datastore information for PV $pvid ==="
 	
-	$vsphere_datastore = Get-Datastore -Name $pv_datastore 
+	$vsphere_datastore = Get-Datastore -Name $pv_datastore -ErrorAction SilentlyContinue
 
 	if ( $vsphere_datastore -eq $null )
 	{
 		Write-Host
-		Write-Host "Unable to find vSphere datastore"
+		Write-Host "Error: Unable to find vSphere datastore $pv_datastore on this vSphere environment"
+		Write-Host "Verify that Kubernetes cluster --- $context --- is running on infrastructure managed by vCenter $server"
 		Write-Host
 		exit
 	}

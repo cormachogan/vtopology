@@ -3,13 +3,13 @@ kind: Plugin
 metadata:
   name: vtopology
 spec:
-  version: "v1.0.7"
+  version: "v1.0.8"
   platforms:
   - selector:
       matchExpressions:
       - {key: os, operator: In, values: [linux]}
     uri: ./vtopology.tar.gz
-    sha256: "f7b8c979ac98bcba641f5864f3d79be4ae91e370adf30755a8c8464e8ee1d855"
+    sha256: "91638cff5363f71414f7fd3a633e0b0e185039175ef132e7b306ee64cee99ea6"
     files:
     - from: "/*.ps1"
       to: "."     
@@ -21,4 +21,4 @@ spec:
   description: |
     This plugin shows underlying vSphere infrastructure details
     when Kubernetes is running on vSphere. Use the -h | --help
-    option to get more description and example usages.
+    option to get help on the available options.
