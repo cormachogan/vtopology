@@ -89,21 +89,21 @@ function usage()
 
 function check_deps()
 {
-	if (( Get-Command "pwsh" -ErrorAction SilentlyContinue ) -eq $null )
+	if ( $null -eq ( Get-Command "pwsh" -ErrorAction SilentlyContinue ))
 	{
                 WRITE-HOST "Unable to find powershell (pwsh) - ensure it is installed, and added to your PATH"
                 WRITE-HOST
 		usage
         }
 
-	if (( Get-Command "awk" -ErrorAction SilentlyContinue ) -eq $null )
+	if ( $null -eq ( Get-Command "awk" -ErrorAction SilentlyContinue ))
 	{
                 WRITE-HOST "Unable to find awk - ensure it is installed, and added to your PATH"
                 WRITE-HOST
 		usage
         }
 
-	if (( Get-Command "kubectl" -ErrorAction SilentlyContinue ) -eq $null )
+	if ( $null -eq ( Get-Command "kubectl" -ErrorAction SilentlyContinue ))
 	{
                 WRITE-HOST "Unable to find kubectl - ensure it is installed, and added to your PATH"
                 WRITE-HOST
@@ -421,7 +421,7 @@ function get_k8s_node_info([string]$server, [string]$user, [string]$passwd, [str
 #
 #########################################################################
 
-	if ( $KVM -eq $null )
+	if ( $null -eq $KVM )
 	{
 		Write-Host
 		Write-Host "Error: Unable to find Virtual Machine matching Kubernetes Node --- $nodeid --- with IP Address $IPAddress"
@@ -974,7 +974,7 @@ function get_pv_info([string]$server, [string]$user, [string]$passwd, [string]$p
 	
 	$vsphere_datastore = Get-Datastore -Name $pv_datastore -ErrorAction SilentlyContinue
 
-	if ( $vsphere_datastore -eq $null )
+	if ( $null -eq $vsphere_datastore )
 	{
 		Write-Host
 		Write-Host "Error: Unable to find vSphere datastore $pv_datastore on this vSphere environment"
@@ -1007,7 +1007,7 @@ function get_pv_info([string]$server, [string]$user, [string]$passwd, [string]$p
 
 	$pv_vmdk = Get-HardDisk -Datastore $pv_datastore -DatastorePath "[$pv_datastore] $pv_volpath" 
 
-	if ( $pv_vmdk -eq $null )
+	if ( $null -eq $pv_vmdk )
 	{
 		Write-Host
 		Write-Host "Unable to find VMDK"
@@ -1071,7 +1071,7 @@ function get_pv_info([string]$server, [string]$user, [string]$passwd, [string]$p
 #
 ###########################################################################################
 
-	if ( $PV_POLICY -eq $null )
+	if ( $null -eq $PV_POLICY )
 	{
 		Write-Host
 		Write-Host "`tVMDK $pv_volpath does not appear to be attached to any K8s node - cannot retrive storage policy information..."
