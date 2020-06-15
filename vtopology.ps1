@@ -50,34 +50,30 @@ Set-PowerCLIConfiguration -DisplayDeprecationWarnings $false -confirm:$false > /
 function usage()
 {
 	WRITE-HOST
-	WRITE-HOST "*** vTopology version 1.0.6 ***"
+	WRITE-HOST "*** vTopology version 1.0.8 ***"
 	WRITE-HOST
-        WRITE-HOST "Usage: kubectl vtopology <connect-args> <args>"
+    WRITE-HOST "Usage: kubectl vtopology <connect-args> <args>"
 	WRITE-HOST
-        WRITE-HOST "  where connect-args (optionally) includes the following:"
+    WRITE-HOST "  where connect-args (optionally) includes the following:"
 	WRITE-HOST " -vc | --vcenter"
 	WRITE-HOST "  -u | --username"
 	WRITE-HOST "  -p | --password"
 	WRITE-HOST
-        WRITE-HOST "  and where args is one of the following:"
-        WRITE-HOST "  -e | --hosts"
-        WRITE-HOST "  -v | --vms"
-        WRITE-HOST "  -n | --networks"
-        WRITE-HOST "  -d | --datastores"
-        WRITE-HOST "  -k | --k8svms"
-        WRITE-HOST "  -s | --spbm"
-        WRITE-HOST "  -o | --orphanpvs"
-        WRITE-HOST "  -t | --tags"
-        WRITE-HOST "  -a | --all"
-        WRITE-HOST "  -h | --help"
-        WRITE-HOST
-        WRITE-HOST "Advanced args"
-        WRITE-HOST "  -pv <pv_id>     - display vSphere storage details about a Persistent Volume"
-        WRITE-HOST "  -kn <node_name> - display vSphere VM details about a Kubernetes node"
+    WRITE-HOST "  and where args is one of the following:"
+    WRITE-HOST "  -e | --hosts"
+    WRITE-HOST "  -v | --vms"
+    WRITE-HOST "  -n | --networks"
+    WRITE-HOST "  -d | --datastores"
+    WRITE-HOST "  -k | --k8svms"
+    WRITE-HOST "  -s | --spbm"
+    WRITE-HOST
+    WRITE-HOST "Advanced args"
+    WRITE-HOST "  -pv <pv_id>     - display vSphere storage details about a Persistent Volume"
+    WRITE-HOST "  -kn <node_name> - display vSphere VM details about a Kubernetes node"
 	WRITE-HOST "  -sp <policy>    - display details of storage policy"
-        WRITE-HOST
-        WRITE-HOST "Note this tool requires PowerShell with PowerCLI, kubectl and awk"
-        WRITE-HOST
+    WRITE-HOST
+    WRITE-HOST "Note this tool requires PowerShell with PowerCLI, kubectl and awk"
+    WRITE-HOST
 	exit
 }
 
