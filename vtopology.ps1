@@ -10,16 +10,18 @@
 #
 # This tool requires PowerShell and PowerCLI
 #
-# It has been tested on Ubuntu 17.04
+# It has been tested on Ubuntu 17.04 and macOS Catalina 10.15.5
 # 
 # For instructions on deploying PowerShell and PowerCLI on Ubuntu, please see:
-#
 # https://blog.inkubate.io/install-powershell-and-powercli-on-ubuntu-16-04/
 # - (although change the repo to 17.04)
 #
-# Note: I have been informed that this script will also run on MacOS/Darwin, but 
-# you will need to modiy the interpeter on line 1 of this script to point to the 
-# location of pwsh on your system
+# For instructions on deploying PowerShell and PowerCLI on macOS, please see:
+# https://docs.microsoft.com/en-us/powershell/scripting/install/installing-powershell-core-on-macos?view=powershell-7 
+#
+# Note: I have been informed that this script will also run on MacOS/Darwin, when
+# launched via krew, but you will need to modiy the interpeter on line 1 of this 
+# script to point to the location of pwsh on your system
 #
 ####################################################################################
 #
@@ -140,14 +142,14 @@ function vc_login()
 ##########################################################
 
 
-function get_hosts([string]$server, [string]$user, [string]$pwd)
+function get_hosts([string]$server, [string]$user, [string]$passwd)
 {
 
 	#Write-Host "Debug GH: vCenter Server $server"
 	#Write-Host "Debug GH: vCenter username $user"
-	#Write-Host "Debug GH: vCenter password $pwd"
+	#Write-Host "Debug GH: vCenter password $passwd"
 
-	$connected = Connect-VIServer $server -User $user -Password $pwd -force
+	$connected = Connect-VIServer $server -User $user -Password $passwd -force
 
 	$AllDCs = Get-DataCenter
 	
@@ -209,14 +211,14 @@ function get_hosts([string]$server, [string]$user, [string]$pwd)
 ##########################################################
 
 
-function get_vms([string]$server, [string]$user, [string]$pwd)
+function get_vms([string]$server, [string]$user, [string]$passwd)
 {
 
 	#Write-Host "Debug GH: vCenter Server $server"
 	#Write-Host "Debug GH: vCenter username $user"
-	#Write-Host "Debug GH: vCenter password $pwd"
+	#Write-Host "Debug GH: vCenter password $passwd"
 
-	$connected = Connect-VIServer $server -User $user -Password $pwd -force
+	$connected = Connect-VIServer $server -User $user -Password $passwd -force
 
 	$AllDCs = Get-DataCenter
 	
@@ -284,14 +286,14 @@ function get_vms([string]$server, [string]$user, [string]$pwd)
 ##########################################################
 
 
-function get_networks([string]$server, [string]$user, [string]$pwd)
+function get_networks([string]$server, [string]$user, [string]$passwd)
 {
 
 	#Write-Host "Debug GH: vCenter Server $server"
 	#Write-Host "Debug GH: vCenter username $user"
-	#Write-Host "Debug GH: vCenter password $pwd"
+	#Write-Host "Debug GH: vCenter password $passwd"
 
-	$connected = Connect-VIServer $server -User $user -Password $pwd -force
+	$connected = Connect-VIServer $server -User $user -Password $passwd -force
 
 	$AllVDS = Get-VirtualSwitch
 	
@@ -322,14 +324,14 @@ function get_networks([string]$server, [string]$user, [string]$pwd)
 ##########################################################
 
 
-function get_datastores([string]$server, [string]$user, [string]$pwd)
+function get_datastores([string]$server, [string]$user, [string]$passwd)
 {
 
 	#Write-Host "Debug GH: vCenter Server $server"
 	#Write-Host "Debug GH: vCenter username $user"
-	#Write-Host "Debug GH: vCenter password $pwd"
+	#Write-Host "Debug GH: vCenter password $passwd"
 
-	$connected = Connect-VIServer $server -User $user -Password $pwd -force
+	$connected = Connect-VIServer $server -User $user -Password $passwd -force
 
 	$AllDCs = Get-DataCenter
 	
@@ -383,15 +385,15 @@ function get_datastores([string]$server, [string]$user, [string]$pwd)
 #######################################################################
 
 
-function get_k8s_node_info([string]$server, [string]$user, [string]$pwd, [string]$nodeid)
+function get_k8s_node_info([string]$server, [string]$user, [string]$passwd, [string]$nodeid)
 {
 
 	#Write-Host "Debug GH: vCenter Server $server"
 	#Write-Host "Debug GH: vCenter username $user"
-	#Write-Host "Debug GH: vCenter password $pwd"
+	#Write-Host "Debug GH: vCenter password $passwd"
 	#Write-Host "Debug GH: K8s node id $nodeid"
 
-	$connected = Connect-VIServer $server -User $user -Password $pwd -force
+	$connected = Connect-VIServer $server -User $user -Password $passwd -force
 
 #################################################################################################
 #
@@ -410,8 +412,8 @@ function get_k8s_node_info([string]$server, [string]$user, [string]$pwd, [string
 #
 #########################################################################
 
-	#$KVM = Get-VM -NoRecursion | where { $_.Guest.IPAddress -match $IPAddress } 
-	$KVM = Get-VM -NoRecursion | where { $_.Guest.IPAddress -eq $IPAddress } 
+	#$KVM = Get-VM -NoRecursion | Where-Object { $_.Guest.IPAddress -match $IPAddress } 
+	$KVM = Get-VM -NoRecursion | Where-Object { $_.Guest.IPAddress -eq $IPAddress } 
 
 #########################################################################
 #
@@ -488,14 +490,14 @@ function get_k8s_node_info([string]$server, [string]$user, [string]$pwd, [string
 #######################################################################
 #
 
-function get_spbm([string]$server, [string]$user, [string]$pwd)
+function get_spbm([string]$server, [string]$user, [string]$passwd)
 {
 
 	#Write-Host "Debug : vCenter Server $server"
 	#Write-Host "Debug : vCenter username $user"
-	#Write-Host "Debug : vCenter password $pwd"
+	#Write-Host "Debug : vCenter password $passwd"
 
-	$connected = Connect-VIServer $server -User $user -Password $pwd -force
+	$connected = Connect-VIServer $server -User $user -Password $passwd -force
 
 	Write-Host "*** These are the Storage Policies defined on vCenter $server ***"
 	Write-Host "*** The policies could be used as Storage Classes by any K8s cluster running in this environment ***"
@@ -522,14 +524,14 @@ function get_spbm([string]$server, [string]$user, [string]$pwd)
 #######################################################################
 #
 
-function get_orphanpvs([string]$server, [string]$user, [string]$pwd)
+function get_orphanpvs([string]$server, [string]$user, [string]$passwd)
 {
 
 	#Write-Host "Debug : vCenter Server $server"
 	#Write-Host "Debug : vCenter username $user"
-	#Write-Host "Debug : vCenter password $pwd"
+	#Write-Host "Debug : vCenter password $passwd"
 
-	$connected = Connect-VIServer $server -User $user -Password $pwd -force
+	$connected = Connect-VIServer $server -User $user -Password $passwd -force
 
 ###########################################################################################
 #
@@ -621,7 +623,7 @@ function get_orphanpvs([string]$server, [string]$user, [string]$pwd)
 #
 ###########################################################################################
 
-			$KVM = Get-VM -NoRecursion | where { $_.Guest.IPAddress -eq $pod_node_ip } 
+			$KVM = Get-VM -NoRecursion | Where-Object { $_.Guest.IPAddress -eq $pod_node_ip } 
 
 			if ( $KVM.Name -ne $pod_node_name )
 			{
@@ -672,14 +674,14 @@ function get_orphanpvs([string]$server, [string]$user, [string]$pwd)
 #######################################################################
 #
 
-function get_tags([string]$server, [string]$user, [string]$pwd)
+function get_tags([string]$server, [string]$user, [string]$passwd)
 {
 
 	#Write-Host "Debug : vCenter Server $server"
 	#Write-Host "Debug : vCenter username $user"
-	#Write-Host "Debug : vCenter password $pwd"
+	#Write-Host "Debug : vCenter password $passwd"
 
-	$connected = Connect-VIServer $server -User $user -Password $pwd -force
+	$connected = Connect-VIServer $server -User $user -Password $passwd -force
 
 	$AllDCs = Get-DataCenter
 	
@@ -768,14 +770,14 @@ function get_tags([string]$server, [string]$user, [string]$pwd)
 #######################################################################
 #
 
-function get_k8svms([string]$server, [string]$user, [string]$pwd)
+function get_k8svms([string]$server, [string]$user, [string]$passwd)
 {
 
 	#Write-Host "Debug GH: vCenter Server $server"
 	#Write-Host "Debug GH: vCenter username $user"
-	#Write-Host "Debug GH: vCenter password $pwd"
+	#Write-Host "Debug GH: vCenter password $passwd"
 
-	$connected = Connect-VIServer $server -User $user -Password $pwd -force
+	$connected = Connect-VIServer $server -User $user -Password $passwd -force
 
 #########################################################################
 #
@@ -799,7 +801,7 @@ function get_k8svms([string]$server, [string]$user, [string]$pwd)
 #
 #########################################################################
 
-			$K8SVMS = Get-VM -NoRecursion | where { $_.Guest.IPAddress -eq $IPAddress } 
+			$K8SVMS = Get-VM -NoRecursion | Where-Object { $_.Guest.IPAddress -eq $IPAddress } 
 
 
 			foreach ($KVM in $K8SVMS)
@@ -877,14 +879,14 @@ function get_k8svms([string]$server, [string]$user, [string]$pwd)
 #
 #######################################################################
 
-function get_sp_info([string]$server, [string]$user, [string]$pwd, [string]$policyname)
+function get_sp_info([string]$server, [string]$user, [string]$passwd, [string]$policyname)
 {
 
 	#Write-Host "Debug GH: vCenter Server $server"
 	#Write-Host "Debug GH: vCenter username $user"
-	#Write-Host "Debug GH: vCenter password $pwd"
+	#Write-Host "Debug GH: vCenter password $passwd"
 
-	$connected = Connect-VIServer $server -User $user -Password $pwd -force
+	$connected = Connect-VIServer $server -User $user -Password $passwd -force
 
 	WRITE-HOST "Display Detailed Policy attributes of:" $policyname
 	WRITE-HOST
@@ -905,14 +907,14 @@ function get_sp_info([string]$server, [string]$user, [string]$pwd, [string]$poli
 #
 #######################################################################
 
-function get_pv_info([string]$server, [string]$user, [string]$pwd, [string]$pvid)
+function get_pv_info([string]$server, [string]$user, [string]$passwd, [string]$pvid)
 {
 
 	#Write-Host "Debug GH: vCenter Server $server"
 	#Write-Host "Debug GH: vCenter username $user"
-	#Write-Host "Debug GH: vCenter password $pwd"
+	#Write-Host "Debug GH: vCenter password $passwd"
 
-	$connected = Connect-VIServer $server -User $user -Password $pwd -force
+	$connected = Connect-VIServer $server -User $user -Password $passwd -force
 
 #
 #######################################################################
@@ -1042,7 +1044,7 @@ function get_pv_info([string]$server, [string]$user, [string]$pwd, [string]$pvid
 
 	$PV_POLICY = $null
 
-	$ALLVMDKS = Get-VM | Get-HardDisk -DiskType Flat | Select *
+	$ALLVMDKS = Get-VM | Get-HardDisk -DiskType Flat | Select-Object *
 
 	Foreach ($VMDK in $ALLVMDKS)
 	{
@@ -1168,7 +1170,7 @@ function get_pv_info([string]$server, [string]$user, [string]$pwd, [string]$pvid
 #
 ###########################################################################################
 
-		$KVM = Get-VM -NoRecursion | where { $_.Guest.IPAddress -eq $pod_node_ip } 
+		$KVM = Get-VM -NoRecursion | Where-Object { $_.Guest.IPAddress -eq $pod_node_ip } 
 
 		if ( $KVM.Name -ne $pod_node_name )
 		{
@@ -1195,12 +1197,12 @@ function get_pv_info([string]$server, [string]$user, [string]$pwd, [string]$pvid
 #######################################################################
 
 
-function get_all([string]$server, [string]$user, [string]$pwd)
+function get_all([string]$server, [string]$user, [string]$passwd)
 {
 
 	#Write-Host "Debug : vCenter Server $server"
 	#Write-Host "Debug : vCenter username $user"
-	#Write-Host "Debug : vCenter password $pwd"
+	#Write-Host "Debug : vCenter password $passwd"
 
 	Write-Host "=== VMs ==="
 	get_vms $vcenter_server $v_username $v_password
