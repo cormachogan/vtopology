@@ -36,6 +36,7 @@
 # 1.0.6 Option to report all disconnected/orphaned PVs
 # 1.0.7 Add Namespace to PV output
 # 1.0.8 Better error handling to ensure context and vCenter match
+# 1.0.9 Add networking information for services
 #
 ####################################################################################
 #
@@ -296,7 +297,10 @@ function get_networks([string]$server, [string]$user, [string]$passwd)
 	$connected = Connect-VIServer $server -User $user -Password $passwd -force
 
 	$AllVDS = Get-VirtualSwitch
-	
+
+	Write-Host "*** 1. vSphere Networking Information ***"
+	Write-Host
+
 	foreach ($VDS in $AllVDS)
 	{
 		Write-Host
@@ -315,6 +319,88 @@ function get_networks([string]$server, [string]$user, [string]$passwd)
 	}
 
 	Disconnect-VIServer * -Confirm:$false
+
+##########################################	
+#
+#-- 1.0.9 - Service Information
+#
+##########################################
+
+Write-Host "*** 2. Kubernetes Networking Information ***"
+Write-Host 
+
+	$AllServices = & kubectl get svc --all-namespaces -o wide --no-headers 
+
+	foreach ($service in $AllServices)
+	{
+		# Write-Host "Debug : Found Service : " $service
+		$svc_details = $service -split "\s+"
+		$svc_namespace = $svc_details[0]
+		$svc_name =  $svc_details[1]
+		$svc_type = $svc_details[2]
+		$svc_ip = $svc_details[3]
+		$svc_selector =  $svc_details[7]
+
+# Display all services apart from the "kubernetes" and "vsphere-cloud-controller-manager" service
+
+		if (($svc_name -ne "kubernetes") -and ($svc_name -ne "vsphere-cloud-controller-manager"))
+		{
+			Write-Host
+			Write-Host "Service Name : " $svc_name
+			Write-Host "`tNamespace          : " $svc_namespace
+			Write-Host "`tService Type       : " $svc_type
+			Write-Host "`tService Cluster-IP : " $svc_ip
+			Write-Host "`tService Selector   : " $svc_selector
+			Write-Host
+
+# Display Pods which have a matching Service Selector (not handling Services without selectors yet)
+
+			Write-Host "List of Pods which use this service :"
+			$pod_count = 0
+			$pod_details = & kubectl get pods -n $svc_namespace --selector $svc_selector --no-headers
+			foreach ($pod_match in $pod_details)
+			{
+				$pod_details = $pod_match -split "\s+"
+				$pod_name = $pod_details[0]
+				Write-Host "`t`tPod $pod_name has a matching service $svc_name selector - $svc_selector"
+				$pod_count += 1
+			}
+			
+			#Write-Host "DEBUG - Total Pods using $svc_selector is $pod_count"
+
+# Check that there a matching number pf endpoints
+
+			Write-Host
+			Write-Host "List of Endpoints that implement this service :"
+			$endpoint_count = 0
+			$endpoint_details = & kubectl get endpoints $svc_name -n $svc_namespace --no-headers | awk '{print $2}'
+			foreach ($endpoint_match in $endpoint_details)
+			{
+				$endpoint_match = $endpoint_details.split(",")
+
+				foreach ($endpoint in $endpoint_match)
+				{
+					if ( $endpoint -ne "<none>" )
+					{
+						Write-Host "`t`tFound an Endpoint for service $svc_name : " $endpoint
+						$endpoint_count += 1
+					}
+				}
+			}
+			Write-Host
+			#Write-Host "DEBUG - Total Endpoints for $svc_name is $endpoint_count"
+
+			if (($pod_count -eq $endpoint_count) -and ($pod_count -gt 0) -and ($endpoint_count -gt 0))
+			{
+				Write-Host "`t`tPod count $pod_count and Endpoint count $endpoint_count match - Service $svc_name is OK"
+			}
+			elseif (($pod_count -gt 0) -or ($endpoint_count -gt 0))
+			{
+				Write-Host "`t`tPod count $pod_count and Endpoint count $endpoint_count do not match - Service $svc_name is NOT OK"
+			}
+			Write-Host
+		}
+	}
 }
 
 ##########################################################
@@ -327,9 +413,9 @@ function get_networks([string]$server, [string]$user, [string]$passwd)
 function get_datastores([string]$server, [string]$user, [string]$passwd)
 {
 
-	#Write-Host "Debug GH: vCenter Server $server"
-	#Write-Host "Debug GH: vCenter username $user"
-	#Write-Host "Debug GH: vCenter password $passwd"
+	#Write-Host "Debug : vCenter Server $server"
+	#Write-Host "Debug : vCenter username $user"
+	#Write-Host "Debug : vCenter password $passwd"
 
 	$connected = Connect-VIServer $server -User $user -Password $passwd -force
 
