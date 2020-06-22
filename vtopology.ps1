@@ -233,7 +233,7 @@ function get_vms([string]$server, [string]$user, [string]$passwd)
 	#Write-Host "Debug GH: vCenter username $user"
 	#Write-Host "Debug GH: vCenter password $passwd"
 
-	$connected = Connect-VIServer $server -User $user -Password $passwd -force
+	Connect-VIServer $server -User $user -Password $passwd -force | Out-Null
 
 	$AllDCs = Get-DataCenter
 	
