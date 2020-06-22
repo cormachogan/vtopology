@@ -318,7 +318,6 @@ function get_networks([string]$server, [string]$user, [string]$passwd)
 		Write-Host
 	}
 
-	Disconnect-VIServer * -Confirm:$false
 
 ##########################################	
 #
@@ -326,6 +325,7 @@ function get_networks([string]$server, [string]$user, [string]$passwd)
 #
 ##########################################
 
+Write-Host
 Write-Host "*** 2. Kubernetes Networking Information ***"
 Write-Host 
 
@@ -355,36 +355,45 @@ Write-Host
 
 # Display Pods which have a matching Service Selector (not handling Services without selectors yet)
 
-			Write-Host "List of Pods which use this service :"
+			Write-Host "Pods with matching service "$svc_name.Trim()" and selector "$svc_selector.Trim()"`n"
 			$pod_count = 0
 			$pod_details = & kubectl get pods -n $svc_namespace --selector $svc_selector --no-headers
 			foreach ($pod_match in $pod_details)
 			{
-				$pod_details = $pod_match -split "\s+"
-				$pod_name = $pod_details[0]
-				Write-Host "`t`tPod $pod_name has a matching service $svc_name selector - $svc_selector"
+				$pod_details_split = $pod_match -split "\s+"
+				$pod_name = $pod_details_split[0]
+				Write-Host "`tPod Name                        : "$pod_name
+
+				$ext_pod_details = & kubectl get pods $pod_name -n $svc_namespace -o wide --no-headers
+				$ext_pod_details_split = $ext_pod_details -split "\s+"
+				$pod_ip = $ext_pod_details_split[5]
+				$node_name = $ext_pod_details_split[6]
+				Write-Host "`tPod IP Address                  : "$pod_ip
+				Write-Host "`tK8s node where Pod is scheduled : "$node_name
+				Write-Host
 				$pod_count += 1
 			}
 			
 			#Write-Host "DEBUG - Total Pods using $svc_selector is $pod_count"
 
-# Check that there a matching number pf endpoints
+			# Endpoints track the IP Addresses of the objects the service send traffic to.	
+			# When a service selector matches a pod label, that IP Address is added to your endpoints
+
+			# Check that there a matching number of endpoints
 
 			Write-Host
-			Write-Host "List of Endpoints that implement this service :"
+			Write-Host "Endpoints (IP Addresses) that implement this service`n"
 			$endpoint_count = 0
-			$endpoint_details = & kubectl get endpoints $svc_name -n $svc_namespace --no-headers | awk '{print $2}'
-			foreach ($endpoint_match in $endpoint_details)
-			{
-				$endpoint_match = $endpoint_details.split(",")
+			$endpoint_details = & kubectl get endpoints $svc_name -n $svc_namespace --no-headers -o jsonpath='{.subsets[*].addresses[*].ip}'
+			
+			$endpoint_match = $endpoint_details -split "\s+"
 
-				foreach ($endpoint in $endpoint_match)
+			foreach ($endpoint in $endpoint_match)
+			{
+				if ( $endpoint -ne "<none>" )
 				{
-					if ( $endpoint -ne "<none>" )
-					{
-						Write-Host "`t`tFound an Endpoint for service $svc_name : " $endpoint
-						$endpoint_count += 1
-					}
+					Write-Host "`tEndpoint for service $svc_name : " $endpoint
+					$endpoint_count += 1
 				}
 			}
 			Write-Host
@@ -392,15 +401,34 @@ Write-Host
 
 			if (($pod_count -eq $endpoint_count) -and ($pod_count -gt 0) -and ($endpoint_count -gt 0))
 			{
-				Write-Host "`t`tPod count $pod_count and Endpoint count $endpoint_count match - Service $svc_name is OK"
+				Write-Host "`tPod count $pod_count and Endpoint count $endpoint_count match - Service $svc_name is OK"
 			}
 			elseif (($pod_count -gt 0) -or ($endpoint_count -gt 0))
 			{
-				Write-Host "`t`tPod count $pod_count and Endpoint count $endpoint_count do not match - Service $svc_name is NOT OK"
+				Write-Host "`tPod count $pod_count and Endpoint count $endpoint_count do not match - Service $svc_name is NOT OK"
 			}
 			Write-Host
+
+			# Display K8s node interface information
+		
+			Write-Host
+			Write-Host "K8s Node Network Interface Information"
+			Write-Host
+			$endpoint_count = 0
+			$nodename_details = & kubectl get endpoints $svc_name -n $svc_namespace --no-headers -o jsonpath='{.subsets[*].addresses[*].nodeName}'
+			
+			$nodename_match = $nodename_details -split "\s+"
+
+			foreach ($nodename in $nodename_match)
+			{
+				$AllNWInfo = Get-VM -Name $nodename | Get-NetworkAdapter
+				Write-Host "`tKubernetes Worker" $nodename "connected to network" $ALLNWInfo.NetworkName
+			}
+			Write-Host
+			Write-Host "---"
 		}
 	}
+	Disconnect-VIServer * -Confirm:$false
 }
 
 ##########################################################
