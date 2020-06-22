@@ -53,7 +53,7 @@ Set-PowerCLIConfiguration -DisplayDeprecationWarnings $false -confirm:$false > /
 function usage()
 {
 	WRITE-HOST
-	WRITE-HOST "*** vTopology version 1.0.8 ***"
+	WRITE-HOST "*** vTopology version 1.0.9 ***"
 	WRITE-HOST
     WRITE-HOST "Usage: kubectl vtopology <connect-args> <args>"
 	WRITE-HOST
@@ -65,7 +65,9 @@ function usage()
     WRITE-HOST "  and where args is one of the following:"
     WRITE-HOST "  -e | --hosts"
     WRITE-HOST "  -v | --vms"
-    WRITE-HOST "  -n | --networks"
+	WRITE-HOST "  -n | --networks"
+	Write-HOST "  -o | --orphanpvs"
+	WRITE-HOST "  -t | --tags"
     WRITE-HOST "  -d | --datastores"
     WRITE-HOST "  -k | --k8svms"
     WRITE-HOST "  -s | --spbm"
@@ -1640,7 +1642,7 @@ else
 							get_k8s_node_info $vcenter_server $v_username $v_password $args[1] ; break 
 						}
 				}
-				{$_ -in '-sv'}{
+				'-sv'{
 						#Check that a service was supplied
 						if ( !$args[1] )
 						{
