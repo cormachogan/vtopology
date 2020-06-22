@@ -73,7 +73,8 @@ function usage()
     WRITE-HOST "Advanced args"
     WRITE-HOST "  -pv <pv_id>     - display vSphere storage details about a Persistent Volume"
     WRITE-HOST "  -kn <node_name> - display vSphere VM details about a Kubernetes node"
-	WRITE-HOST "  -sp <policy>    - display details of storage policy"
+	WRITE-HOST "  -sp <policy>    - display details about a storage policy"
+	WRITE-HOST "  -sv <service>   - display details about a service"
     WRITE-HOST
     WRITE-HOST "Note this tool requires PowerShell with PowerCLI, kubectl and awk"
     WRITE-HOST
@@ -119,17 +120,23 @@ function check_deps()
 #
 ########################################################################
 #
-
 function vc_login()
 {
 	$vcenter_server = Read-Host -Prompt "Please enter your vCenter Server name/IP address"
 	$v_username = Read-Host -Prompt "Please enter your Username"
 	$secure_password = Read-Host -AsSecureString -Prompt "Please enter your Password"
+
+#################################################	
 #
 # Convert the secure password back to plain text
 #
-	$tempstr = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure_password)
-	$v_password = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($tempstr)
+#################################################
+
+	$v_password = ConvertFrom-SecureString -SecureString $secure_password -AsPlainText
+
+#	Write-Host "Debug Creds: vCenter Server $vcenter_server"
+#	Write-Host "Debug Creds: vCenter username $v_username"
+#	Write-Host "Debug Creds: vCenter password $v_password"
 
 	return $vcenter_server, $v_username, $v_password
 }
@@ -150,7 +157,7 @@ function get_hosts([string]$server, [string]$user, [string]$passwd)
 	#Write-Host "Debug GH: vCenter username $user"
 	#Write-Host "Debug GH: vCenter password $passwd"
 
-	$connected = Connect-VIServer $server -User $user -Password $passwd -force
+	Connect-VIServer $server -User $user -Password $passwd -force | Out-Null
 
 	$AllDCs = Get-DataCenter
 	
@@ -180,17 +187,25 @@ function get_hosts([string]$server, [string]$user, [string]$passwd)
 				Write-Host "`t`t`tNumber of CPU     : "$ESXiHost.NumCpu
 				Write-Host "`t`t`tTotal CPU (MHz)   : "$ESXiHost.CpuTotalMhz
 				Write-Host "`t`t`tCPU Used (MHz)    : "$ESXiHost.CpuUsageMhz
+
+#####################################################################################################################
 #
-# These values return far too many decimal places. This technique limits the value displayed to two decimal places
+#-- These values return far too many decimal places. This technique limits the value displayed to two decimal places
 #
+#####################################################################################################################
+
 				$RoundedTotalMemory = "{0:N2}" -f $ESXiHost.memoryTotalGB
 				Write-Host "`t`t`tTotal Memory (GB) : " $RoundedTotalMemory
 				$RoundedMemoryUsed = "{0:N2}" -f $ESXiHost.MemoryUsageGB
 				Write-Host "`t`t`tMemory Used (GB)  : " $RoundedMemoryUsed
 				Write-Host
+
+#################################
 #
-# 1.0.3 Host Group Information
+#-- 1.0.3 Host Group Information
 #
+#################################
+
 				$hostGroupInfo = Get-DRSclusterGroup -VMHost $ESXiHost
 
 				foreach ($hostgroup in $hostGroupInfo)
@@ -210,7 +225,6 @@ function get_hosts([string]$server, [string]$user, [string]$passwd)
 # Get ALL VMs
 #
 ##########################################################
-
 
 function get_vms([string]$server, [string]$user, [string]$passwd)
 {
@@ -254,17 +268,25 @@ function get_vms([string]$server, [string]$user, [string]$passwd)
 					Write-Host "`t`t`t`tFolder                 : "$VirtualMachine.Folder
 					Write-Host "`t`t`t`tNumber of CPU          : "$VirtualMachine.NumCpu
 					Write-Host "`t`t`t`tTotal Memory (GB)      : "$VirtualMachine.MemoryGB
+
+#####################################################################################################################
 #
 # These values return far too many decimal places. This technique limits the value displayed to two decimal places
 #
+#####################################################################################################################
+
 					$RoundedProvisionedSpaceGB = "{0:N2}" -f $VirtualMachine.ProvisionedSpaceGB
 					Write-Host "`t`t`t`tProvisioned Space (GB) : " $RoundedProvisionedSpaceGB
 					$RoundedUsedSpaceGB = "{0:N2}" -f $VirtualMachine.UsedSpaceGB
 					Write-Host "`t`t`t`tUsed Space (GB)        : " $RoundedUsedSpaceGB
 					Write-Host
+
+###################################
 #
-# 1.0.3 VM/Host Group Information
+#-- 1.0.3 VM/Host Group Information
 #
+###################################
+
 					$VMGroupInfo = Get-DRSclusterGroup -VM $VirtualMachine
 
 					foreach ($vmgroup in $VMGroupInfo)
@@ -294,7 +316,7 @@ function get_networks([string]$server, [string]$user, [string]$passwd)
 	#Write-Host "Debug GH: vCenter username $user"
 	#Write-Host "Debug GH: vCenter password $passwd"
 
-	$connected = Connect-VIServer $server -User $user -Password $passwd -force
+	Connect-VIServer $server -User $user -Password $passwd -force | Out-Null
 
 	$AllVDS = Get-VirtualSwitch
 
@@ -341,7 +363,11 @@ Write-Host
 		$svc_ip = $svc_details[3]
 		$svc_selector =  $svc_details[7]
 
+#################################################################################################
+#
 # Display all services apart from the "kubernetes" and "vsphere-cloud-controller-manager" service
+#
+#################################################################################################
 
 		if (($svc_name -ne "kubernetes") -and ($svc_name -ne "vsphere-cloud-controller-manager"))
 		{
@@ -353,7 +379,11 @@ Write-Host
 			Write-Host "`tService Selector   : " $svc_selector
 			Write-Host
 
+###################################################################################################
+#
 # Display Pods which have a matching Service Selector (not handling Services without selectors yet)
+#
+###################################################################################################
 
 			Write-Host "Pods with matching service "$svc_name.Trim()" and selector "$svc_selector.Trim()"`n"
 			$pod_count = 0
@@ -373,13 +403,13 @@ Write-Host
 				Write-Host
 				$pod_count += 1
 			}
-			
-			#Write-Host "DEBUG - Total Pods using $svc_selector is $pod_count"
+			# Write-Host "DEBUG - Total Pods using $svc_selector is $pod_count"
 
-			# Endpoints track the IP Addresses of the objects the service send traffic to.	
-			# When a service selector matches a pod label, that IP Address is added to your endpoints
-
-			# Check that there a matching number of endpoints
+#################################################################################################
+# Endpoints track the IP Addresses of the objects the service send traffic to.	
+# When a service selector matches a pod label, that IP Address is added to your endpoints
+# Check that there a matching number of endpoints
+#################################################################################################
 
 			Write-Host
 			Write-Host "Endpoints (IP Addresses) that implement this service`n"
@@ -409,8 +439,12 @@ Write-Host
 			}
 			Write-Host
 
-			# Display K8s node interface information
-		
+#################################################################################################
+#
+# Display K8s node interface information
+#
+#################################################################################################
+
 			Write-Host
 			Write-Host "K8s Node Network Interface Information"
 			Write-Host
@@ -445,7 +479,7 @@ function get_datastores([string]$server, [string]$user, [string]$passwd)
 	#Write-Host "Debug : vCenter username $user"
 	#Write-Host "Debug : vCenter password $passwd"
 
-	$connected = Connect-VIServer $server -User $user -Password $passwd -force
+	Connect-VIServer $server -User $user -Password $passwd -force | Out-Null
 
 	$AllDCs = Get-DataCenter
 	
@@ -468,9 +502,13 @@ function get_datastores([string]$server, [string]$user, [string]$passwd)
 				Write-Host "Found Datastore:" $DataStore.Name
 				Write-Host "`tState            : " $DataStore.state
 				Write-Host "`tDatastore Type   : " $DataStore.type
+
+####################################################################################################################
 #
 # These values return far too many decimal places. This technique limits the value displayed to two decimal places
 #
+####################################################################################################################
+
 				$RoundedCapacity = "{0:N2}" -f $DataStore.CapacityGB
 				Write-Host "`tCapacity (GB)    : " $RoundedCapacity
 				$RoundedFreeSpace = "{0:N2}" -f $DataStore.FreeSpaceGB
@@ -494,10 +532,147 @@ function get_datastores([string]$server, [string]$user, [string]$passwd)
 
 #######################################################################
 #
-# Get individual Kubernetes Node info
+#-- v1.0.9 Get individual Kubernetes Service Info 
 #
 #######################################################################
 
+function get_k8s_svc_info([string]$server, [string]$user, [string]$passwd, [string]$svc)
+{
+
+	#Write-Host "Debug : vCenter Server $server"
+	#Write-Host "Debug : vCenter username $user"
+	#Write-Host "Debug : vCenter password $passwd"
+	#Write-Host "Debug : Service $svc"
+
+	Connect-VIServer $server -User $user -Password $passwd -force | Out-Null
+
+
+Write-Host
+Write-Host "*** Kubernetes Networking Information for Service $svc ***"
+Write-Host 
+
+	$AllServices = & kubectl get svc --all-namespaces -o wide --no-headers | grep $svc
+
+	foreach ($service in $AllServices)
+	{
+		$svc_details = $service -split "\s+"
+		$svc_namespace = $svc_details[0]
+		$svc_name =  $svc_details[1]
+		$svc_type = $svc_details[2]
+		$svc_ip = $svc_details[3]
+		$svc_selector =  $svc_details[7]
+
+#################################################################################################
+#
+# Display all services apart from the "kubernetes" and "vsphere-cloud-controller-manager" service
+#
+#################################################################################################
+
+		if (($svc_name -ne "kubernetes") -and ($svc_name -ne "vsphere-cloud-controller-manager"))
+		{
+			Write-Host
+			Write-Host "Service Name : " $svc_name
+			Write-Host "`tNamespace          : " $svc_namespace
+			Write-Host "`tService Type       : " $svc_type
+			Write-Host "`tService Cluster-IP : " $svc_ip
+			Write-Host "`tService Selector   : " $svc_selector
+			Write-Host
+
+###################################################################################################
+#
+# Display Pods which have a matching Service Selector (not handling Services without selectors yet)
+#
+###################################################################################################
+
+			Write-Host "Pods with matching selector "$svc_selector.Trim()"`n"
+			$pod_count = 0
+			$pod_details = & kubectl get pods -n $svc_namespace --selector $svc_selector --no-headers
+			foreach ($pod_match in $pod_details)
+			{
+				$pod_details_split = $pod_match -split "\s+"
+				$pod_name = $pod_details_split[0]
+				Write-Host "`tPod Name                        : "$pod_name
+
+				$ext_pod_details = & kubectl get pods $pod_name -n $svc_namespace -o wide --no-headers
+				$ext_pod_details_split = $ext_pod_details -split "\s+"
+				$pod_ip = $ext_pod_details_split[5]
+				$node_name = $ext_pod_details_split[6]
+				Write-Host "`tPod IP Address                  : "$pod_ip
+				Write-Host "`tK8s node where Pod is scheduled : "$node_name
+				Write-Host
+				$pod_count += 1
+			}
+			
+			#Write-Host "DEBUG - Total Pods using $svc_selector is $pod_count"
+
+###################################################################################################
+#
+# Endpoints track the IP Addresses of the objects the service send traffic to.	
+# When a service selector matches a pod label, that IP Address is added to your endpoints
+#
+# Check that there a matching number of endpoints
+#
+###################################################################################################
+
+			Write-Host
+			Write-Host "Endpoints (IP Addresses) that implement this service`n"
+			$endpoint_count = 0
+			$endpoint_details = & kubectl get endpoints $svc_name -n $svc_namespace --no-headers -o jsonpath='{.subsets[*].addresses[*].ip}'
+			
+			$endpoint_match = $endpoint_details -split "\s+"
+
+			foreach ($endpoint in $endpoint_match)
+			{
+				if ( $endpoint -ne "<none>" )
+				{
+					Write-Host "`tEndpoint for service $svc_name : " $endpoint
+					$endpoint_count += 1
+				}
+			}
+			Write-Host
+			# Write-Host "DEBUG - Total Endpoints for $svc_name is $endpoint_count"
+
+			if (($pod_count -eq $endpoint_count) -and ($pod_count -gt 0) -and ($endpoint_count -gt 0))
+			{
+				Write-Host "`tPod count $pod_count and Endpoint count $endpoint_count match - Service $svc_name is OK"
+			}
+			elseif (($pod_count -gt 0) -or ($endpoint_count -gt 0))
+			{
+				Write-Host "`tPod count $pod_count and Endpoint count $endpoint_count do not match - Service $svc_name is NOT OK"
+			}
+			Write-Host
+
+########################################
+#
+# Display K8s node interface information
+#
+########################################
+		
+			Write-Host
+			Write-Host "K8s Node Network Interface Information"
+			Write-Host
+			$endpoint_count = 0
+			$nodename_details = & kubectl get endpoints $svc_name -n $svc_namespace --no-headers -o jsonpath='{.subsets[*].addresses[*].nodeName}'
+			
+			$nodename_match = $nodename_details -split "\s+"
+
+			foreach ($nodename in $nodename_match)
+			{
+				$AllNWInfo = Get-VM -Name $nodename | Get-NetworkAdapter
+				Write-Host "`tKubernetes Worker" $nodename "connected to network" $ALLNWInfo.NetworkName
+			}
+			Write-Host
+		}
+	}
+
+	Disconnect-VIServer * -Confirm:$false
+}
+
+#######################################################################
+#
+# Get individual Kubernetes Node info
+#
+#######################################################################
 
 function get_k8s_node_info([string]$server, [string]$user, [string]$passwd, [string]$nodeid)
 {
@@ -507,7 +682,7 @@ function get_k8s_node_info([string]$server, [string]$user, [string]$passwd, [str
 	#Write-Host "Debug GH: vCenter password $passwd"
 	#Write-Host "Debug GH: K8s node id $nodeid"
 
-	$connected = Connect-VIServer $server -User $user -Password $passwd -force
+	Connect-VIServer $server -User $user -Password $passwd -force | Out-Null
 
 #################################################################################################
 #
@@ -595,7 +770,6 @@ function get_k8s_node_info([string]$server, [string]$user, [string]$passwd, [str
 	Disconnect-VIServer * -Confirm:$false
 }
 
-
 #
 #######################################################################
 #
@@ -611,7 +785,7 @@ function get_spbm([string]$server, [string]$user, [string]$passwd)
 	#Write-Host "Debug : vCenter username $user"
 	#Write-Host "Debug : vCenter password $passwd"
 
-	$connected = Connect-VIServer $server -User $user -Password $passwd -force
+	Connect-VIServer $server -User $user -Password $passwd -force | Out-Null
 
 	Write-Host "*** These are the Storage Policies defined on vCenter $server ***"
 	Write-Host "*** The policies could be used as Storage Classes by any K8s cluster running in this environment ***"
@@ -626,8 +800,6 @@ function get_spbm([string]$server, [string]$user, [string]$passwd)
 	Write-Host
 
 }
-
-
 
 #
 #######################################################################
@@ -645,7 +817,7 @@ function get_orphanpvs([string]$server, [string]$user, [string]$passwd)
 	#Write-Host "Debug : vCenter username $user"
 	#Write-Host "Debug : vCenter password $passwd"
 
-	$connected = Connect-VIServer $server -User $user -Password $passwd -force
+	Connect-VIServer $server -User $user -Password $passwd -force | Out-Null
 
 ###########################################################################################
 #
@@ -776,9 +948,6 @@ function get_orphanpvs([string]$server, [string]$user, [string]$passwd)
 	Disconnect-VIServer * -Confirm:$false
 }
 
-
-
-
 #
 #######################################################################
 #
@@ -795,7 +964,7 @@ function get_tags([string]$server, [string]$user, [string]$passwd)
 	#Write-Host "Debug : vCenter username $user"
 	#Write-Host "Debug : vCenter password $passwd"
 
-	$connected = Connect-VIServer $server -User $user -Password $passwd -force
+	Connect-VIServer $server -User $user -Password $passwd -force | Out-Null
 
 	$AllDCs = Get-DataCenter
 	
@@ -804,9 +973,13 @@ function get_tags([string]$server, [string]$user, [string]$passwd)
 		Write-Host
 		Write-Host "`tFound DataCenter:" $DC.Name
 		Write-Host
+
+################################
 #
 # Get all DataCenter tags
 #	
+################################
+
 		$ALLDCTAGS = Get-DataCenter $DC | Get-TagAssignment 
 
 		if ($ALLDCTAGS)
@@ -821,9 +994,13 @@ function get_tags([string]$server, [string]$user, [string]$passwd)
 			Write-Host "`t`tNo tags found for Datacenter" $DC.Name
 		}
 		Write-Host
+
+#################################
 #
 # Get all Cluster tags
 #	
+#################################
+
 		$ALLClusters = Get-Cluster -Location $DC
 
 		foreach ($Cluster in $AllClusters)
@@ -846,9 +1023,13 @@ function get_tags([string]$server, [string]$user, [string]$passwd)
 			}
 			Write-Host
 		}
+
+##############################
 #
 # Get all Datastore tags
 #	
+##############################
+
 		$AllDatastores = Get-Datastore -Location $DC
 
 		foreach ($DataStore in $AllDatastores)
@@ -875,7 +1056,6 @@ function get_tags([string]$server, [string]$user, [string]$passwd)
 	Disconnect-VIServer * -Confirm:$false
 }
 
-
 #
 #######################################################################
 #
@@ -891,7 +1071,7 @@ function get_k8svms([string]$server, [string]$user, [string]$passwd)
 	#Write-Host "Debug GH: vCenter username $user"
 	#Write-Host "Debug GH: vCenter password $passwd"
 
-	$connected = Connect-VIServer $server -User $user -Password $passwd -force
+	Connect-VIServer $server -User $user -Password $passwd -force | Out-Null
 
 #########################################################################
 #
@@ -1000,7 +1180,7 @@ function get_sp_info([string]$server, [string]$user, [string]$passwd, [string]$p
 	#Write-Host "Debug GH: vCenter username $user"
 	#Write-Host "Debug GH: vCenter password $passwd"
 
-	$connected = Connect-VIServer $server -User $user -Password $passwd -force
+	Connect-VIServer $server -User $user -Password $passwd -force | Out-Null
 
 	WRITE-HOST "Display Detailed Policy attributes of:" $policyname
 	WRITE-HOST
@@ -1028,7 +1208,7 @@ function get_pv_info([string]$server, [string]$user, [string]$passwd, [string]$p
 	#Write-Host "Debug GH: vCenter username $user"
 	#Write-Host "Debug GH: vCenter password $passwd"
 
-	$connected = Connect-VIServer $server -User $user -Password $passwd -force
+	Connect-VIServer $server -User $user -Password $passwd -force | Out-Null
 
 #
 #######################################################################
@@ -1302,14 +1482,12 @@ function get_pv_info([string]$server, [string]$user, [string]$passwd, [string]$p
 	Disconnect-VIServer * -Confirm:$false
 }
 
-
 #######################################################################
 #
 # Display Everything...
 # Get the path to VMs, Networks, Hosts, Datastores and K8s nodes
 #
 #######################################################################
-
 
 function get_all([string]$server, [string]$user, [string]$passwd)
 {
@@ -1354,10 +1532,14 @@ else
 
 	if (( $Args.Count -eq 1 ) -or ( $Args.Count -eq 2 ))
 	{
+
+###################################################################
 #
 # Uncomment if you want the script to clear screen on each run
 #
 #		Clear-Host
+#
+###################################################################
 
 		Write-Host
 		$Context = & kubectl config current-context
@@ -1366,113 +1548,135 @@ else
 		Write-Host "*** To switch to another context, use the kubectl config use-context command ***"
 		Write-Host
 
-		
+######################################################################################		
 #
 # If there are only 1 or 2 args, then we can assume that no credentials were passed
 # Thus we need to first of all prompt for credentials (unless asking for help output)
 #
-       		switch -exact -casesensitive ($args[0]){
-                	{$_ -in '-e', '--hosts'} { 
-							$vcenter_server, $v_username, $v_password = vc_login
-							get_hosts $vcenter_server $v_username $v_password ; break 
-						}
-			{$_ -in '-v', '--vms'} { 
-							$vcenter_server, $v_username, $v_password = vc_login
-							get_vms $vcenter_server $v_username $v_password ; break 
-						}
-                	{$_ -in '-n', '--networks'} 
-						{ 
-							$vcenter_server, $v_username, $v_password = vc_login
-							get_networks $vcenter_server $v_username $v_password ; break 
-						}
-                	{$_ -in '-d', '--datastores'} 
-						{ 
-							$vcenter_server, $v_username, $v_password = vc_login
-							get_datastores $vcenter_server $v_username $v_password ; break 
-						}
-                	{$_ -in '-k', '--k8svms'} 
-						{ 
-							$vcenter_server, $v_username, $v_password = vc_login
-							get_k8svms $vcenter_server $v_username $v_password ; break 
-						}
-                	{$_ -in '-s', '--spbm'} 
-						{ 
-							$vcenter_server, $v_username, $v_password = vc_login
-							get_spbm $vcenter_server $v_username $v_password ; break 
-						}
-                	{$_ -in '-o', '--orphanpvs'} 
-						{ 
-							$vcenter_server, $v_username, $v_password = vc_login
-							get_orphanpvs $vcenter_server $v_username $v_password ; break 
-						}
-                	{$_ -in '-t', '--tags'} 
-						{ 
-							$vcenter_server, $v_username, $v_password = vc_login
-							get_tags $vcenter_server $v_username $v_password ; break 
-						}
-                	{$_ -in '-a', '--all'} 
-						{ 
-							$vcenter_server, $v_username, $v_password = vc_login
-							get_all $vcenter_server $v_username $v_password ; break
-						}
-                	{$_ -in '-h', '--help'} { usage }
-                	'-sp'{
-                       	 		# Check that Policy Name was supplied
-                       	 		if ( !$args[1] )
-                       	 		{
-                       	       			Write-Host "No Policy Name supplied - please provide the Policy Name after -sp"
-                       	       			Write-Host "The Policy Names can be found by running this tool with the -s|--spbm option"
-                       	       			Write-Host
-					}
-                       	 		else
-					{ 
-						$vcenter_server, $v_username, $v_password = vc_login
-						get_sp_info $vcenter_server $v_username $v_password $args[1] ; break 
-					}
+######################################################################################
+
+       	switch -exact -casesensitive ($args[0]){
+				{$_ -in '-e', '--hosts'} 
+				{ 
+					$vcenter_server, $v_username, $v_password = vc_login							
+					get_hosts $vcenter_server $v_username $v_password ; break 
 				}
-                	'-pv'{
-                       	 		# Check that PV ID was supplied
-                       	 		if ( !$args[1] )
-                       	 		{
-                       	       			Write-Host "No Persistent Volume ID supplied - please provide the PV ID after -pv"
-                       	       			Write-Host "The PV ID can be found using kubectl get pv"
-                       	       			Write-Host
-					}
-                       	 		else
-					{ 
-						$vcenter_server, $v_username, $v_password = vc_login
-						get_pv_info $vcenter_server $v_username $v_password $args[1] ; break 
-					}
+				{$_ -in '-v', '--vms'} 
+				{ 
+					$vcenter_server, $v_username, $v_password = vc_login
+					get_vms $vcenter_server $v_username $v_password ; break 
 				}
-                	'-kn'{
-                        		# Check that Node name was supplied
-                        		if ( !$args[1] )
-                        		{
-                                		Write-Host "No Kubernetes Node name supplied - please provide the Node name after -kn"
-                                		Write-Host "The Node name can be found using kubectl get nodes"
-                                		Write-Host
-					}
-                        		else
-					{ 
-						$vcenter_server, $v_username, $v_password = vc_login
-						get_k8s_node_info $vcenter_server $v_username $v_password $args[1] ; break 
-					}
+                {$_ -in '-n', '--networks'} 
+				{ 
+					$vcenter_server, $v_username, $v_password = vc_login
+					get_networks $vcenter_server $v_username $v_password ; break 
 				}
-                	default {
-                       	 		usage
+                {$_ -in '-k', '--k8svms'} 
+				{ 
+					$vcenter_server, $v_username, $v_password = vc_login
+					get_k8svms $vcenter_server $v_username $v_password ; break 
+				}
+                {$_ -in '-s', '--spbm'} 
+				{ 
+					$vcenter_server, $v_username, $v_password = vc_login
+					get_spbm $vcenter_server $v_username $v_password ; break 
+				}
+                {$_ -in '-o', '--orphanpvs'} 
+				{ 
+					$vcenter_server, $v_username, $v_password = vc_login
+					get_orphanpvs $vcenter_server $v_username $v_password ; break 
+				}
+                {$_ -in '-t', '--tags'} 
+				{ 
+					$vcenter_server, $v_username, $v_password = vc_login
+					get_tags $vcenter_server $v_username $v_password ; break 
+				}
+                {$_ -in '-a', '--all'} 
+				{ 
+					$vcenter_server, $v_username, $v_password = vc_login
+					get_all $vcenter_server $v_username $v_password ; break
+				}
+                {$_ -in '-h', '--help'} { usage }
+				'-sp'
+				{		  
+						# Check that Policy Name was supplied						  
+                     	if ( !$args[1] )
+                   	 	{
+                   	       	Write-Host "No Policy Name supplied - please provide the Policy Name after -sp"
+                   	       	Write-Host "The Policy Names can be found by running this tool with the -s|--spbm option"
+                   	       	Write-Host
+						}
+                     	else
+						{ 
+							$vcenter_server, $v_username, $v_password = vc_login
+							get_sp_info $vcenter_server $v_username $v_password $args[1] ; break 
+						}
+				}
+                '-pv'{
+                   	 	# Check that PV ID was supplied
+                   	 	if ( !$args[1] )
+                     	{
+                           	Write-Host "No Persistent Volume ID supplied - please provide the PV ID after -pv"
+                           	Write-Host "The PV ID can be found using kubectl get pv"
+                           	Write-Host
+						}
+                       	else
+						{ 
+							$vcenter_server, $v_username, $v_password = vc_login
+							get_pv_info $vcenter_server $v_username $v_password $args[1] ; break 
+						}
+				}
+                '-kn'{
+                    	# Check that Node name was supplied
+                    	if ( !$args[1] )
+                        {
+                            Write-Host "No Kubernetes Node name supplied - please provide the Node name after -kn"
+                            Write-Host "The Node name can be found using kubectl get nodes"
+                            Write-Host
+						}
+                        else
+						{ 
+							$vcenter_server, $v_username, $v_password = vc_login
+							get_k8s_node_info $vcenter_server $v_username $v_password $args[1] ; break 
+						}
+				}
+				{$_ -in '-sv'}{
+						#Check that a service was supplied
+						if ( !$args[1] )
+						{
+							Write-Host "No Kubernetes service name supplied - please provide the service name after -sv"
+                            Write-Host "The Service name can be found using kubectl get svc"
+                            Write-Host
+						}
+						else 
+						{
+							$vcenter_server, $v_username, $v_password = vc_login
+							get_k8s_svc_info $vcenter_server $v_username $v_password $args[1] ; break 
+						}
+				}
+                default {
+                     		usage
                 		}
 			}
-			exit
+		exit
 	}
+
+###################################################################
 #
 # If there are 7 or 8 args, then we can assume that no credentials were passed
 #
+###################################################################
+
 	elseif (( $Args.Count -eq 7 ) -or ( $Args.Count -eq 8 ))
 	{
+
+###################################################################
 #
 # Uncomment if you want the script to clear screen on each run
 #
 #		Clear-Host
+#
+###################################################################
 
 		Write-Host
 		$Context = & kubectl config current-context
@@ -1481,9 +1685,12 @@ else
 		Write-Host "*** To switch to another context, use the kubectl config use-context command ***"
 		Write-Host
 
+###################################################################
 #
 # Get the vCenter server
 #
+###################################################################
+
 		if (( $args[0] -eq '-vc') -or ( $args[0] -eq '--vcenter' ))
 		{
 			$vcenter_server = $args[1]
@@ -1502,9 +1709,12 @@ else
                         Write-Host
 			usage
 		}
+
+###################################################################
 #
 # Get the vSphere username
 #
+###################################################################
 
 		if (( $args[0] -eq '-u') -or ( $args[0] -eq '--username' ))
 		{
@@ -1524,9 +1734,12 @@ else
                         Write-Host
 			usage
 		}
+
+###################################################################
 #
 # Get the vSphere password
 #
+###################################################################
 
 		if (( $args[0] -eq '-p') -or ( $args[0] -eq '--password' ))
 		{
@@ -1551,10 +1764,9 @@ else
 		#Write-Host "Debug: Username $v_username"
 		#Write-Host "Debug: Password $v_password"
 
-
        		switch -exact -casesensitive ($args[6]){
                 	{$_ -in '-e', '--hosts'} { get_hosts $vcenter_server $v_username $v_password ; break }
-			{$_ -in '-v', '--vms'} { get_vms $vcenter_server $v_username $v_password ; break }
+					{$_ -in '-v', '--vms'} { get_vms $vcenter_server $v_username $v_password ; break }
                 	{$_ -in '-n', '--networks'} { get_networks $vcenter_server $v_username $v_password ; break }
                 	{$_ -in '-d', '--datastores'} { get_datastores $vcenter_server $v_username $v_password ; break }
                 	{$_ -in '-k', '--k8svms'} { get_k8svms $vcenter_server $v_username $v_password ; break }
@@ -1593,7 +1805,7 @@ else
 			      }
                 	 '-kn'{
                         		# Check that Node name was supplied
-                        		if ( !$args[1] )
+                        		if ( !$args[7] )
                         		{
                                 		Write-Host "No Kubernetes Node name supplied - please provide the Node name after -kn"
                                 		Write-Host "The Node name can be found using kubectl get nodes"
@@ -1605,6 +1817,20 @@ else
 						get_k8s_node_info $vcenter_server $v_username $v_password $args[7] ;break 
 					}
 				}
+					'-sv'{
+							# Check that Node name was supplied
+							if ( !$args[7] )
+							{
+									Write-Host "No Kubernetes Service name supplied - please provide the Service name after -sv"
+									Write-Host "The Service name can be found using kubectl get svc"
+									Write-Host
+							}
+						else
+						{ 
+								#Write-Host "Debug: KN - vCenter Server $vcenter_server $args[7]"
+								get_k8s_svc_info $vcenter_server $v_username $v_password $args[7] ;break 
+						}
+					}
                 	default {
                        	 		usage
                 		}
