@@ -4,13 +4,14 @@
 
 vtopology is a combination of bash and Powershell/PowerCLI for displaying vSphere topology from kubectl. The idea is that you should be able to map Kubernetes objects (e.g. nodes, PVs) to vSphere objects (e.g. virtual machines, VMDKs). Once installed, users can run vtopology and display underlying vSphere infrastructure components to see how their Kubernetes cluster is consuming vSphere resources.
 
-The script has also been configured to run as a krew plugin. This means that users can run the script as a 'kubectl vtopology' command.
-For more information about how to install krew, go here: https://github.com/kubernetes-sigs/krew/blob/master/README.md Alternatively, simply extract the tar/gzip bundle and type 'pwsh ./vtopology.ps1 -h' for help on how to run the tool.
+The script can be run as a stanalone powershell script or run as a krew plugin. Running as a krew plugin means that users can run the tool via a 'kubectl vtopology' command.
+For more information about how to install krew, go here: https://github.com/kubernetes-sigs/krew/blob/master/README.md.
+Alternatively, simply extract the tar/gzip bundle and type 'pwsh ./vtopology.ps1 -h' for help on how to run the tool.
 
-Both PowerShell and PowerCLI are required. For PowerShell and PowerCLI deployment instructions on Ubuntu, go here:
+Both PowerShell and PowerCLI are required for this tool to work. For PowerShell and PowerCLI deployment instructions on Ubuntu, go here:
 https://blog.inkubate.io/install-powershell-and-powercli-on-ubuntu-16-04/ (you will need to modify the instructions slightly to point to the correct repository for your OS version - I have used the same steps to deploy Ubuntu 17.04)
 
-This tool has been tested and validated on Ubuntu 17.04. It has also been tested and validated on MacOS (Darwin) but the shell interpreter path to PowerShell (line 1 of vtopology.ps1 script) needs to be changed accordingly.
+This tool has been tested and validated on Ubuntu 17.04. It has also been tested and validated on MacOS (Darwin) but the shell interpreter path to PowerShell (line 1 of vtopology.ps1 script) needs to be changed accordingly. On my MacOS environment, pwsh was found is /usr/local/bin. Once vtopology is installed by krew, it can be found in ~/.krew/store/vtopology.
 
 
 ## vtopology Deployment instructions for krew
@@ -41,18 +42,19 @@ Usage: kubectl vtopology <connect-args> <args>
   -e | --hosts
   -v | --vms
   -n | --networks
+  -o | --orphanpvs
+  -t | --tags
   -d | --datastores
   -k | --k8svms
   -s | --spbm
-  -o | --orphanpvs
-  -t | --tags
   -a | --all
   -h | --help
 
 Advanced args
   -pv <pv_id>     - display vSphere storage details about a Persistent Volume
   -kn <node_name> - display vSphere VM details about a Kubernetes node
-  -sp <policy>    - display details of storage policy
+  -sp <policy>    - display details about a storage policy
+  -sv <service>   - disply details about a service
 
 Note this tool requires PowerShell with PowerCLI, kubectl and awk
 ```

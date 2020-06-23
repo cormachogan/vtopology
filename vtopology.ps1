@@ -70,7 +70,8 @@ function usage()
 	WRITE-HOST "  -t | --tags"
     WRITE-HOST "  -d | --datastores"
     WRITE-HOST "  -k | --k8svms"
-    WRITE-HOST "  -s | --spbm"
+	WRITE-HOST "  -s | --spbm"
+	WRITE-HOST "  -a | --all"
     WRITE-HOST
     WRITE-HOST "Advanced args"
     WRITE-HOST "  -pv <pv_id>     - display vSphere storage details about a Persistent Volume"
