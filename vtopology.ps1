@@ -19,9 +19,9 @@
 # For instructions on deploying PowerShell and PowerCLI on macOS, please see:
 # https://docs.microsoft.com/en-us/powershell/scripting/install/installing-powershell-core-on-macos?view=powershell-7 
 #
-# Note: I have been informed that this script will also run on MacOS/Darwin, when
-# launched via krew, but you will need to modiy the interpeter on line 1 of this 
-# script to point to the location of pwsh on your system
+# Note: This script will also run on MacOS/Darwin, when launched via 
+# krew, but you will need to modify the interpeter on line 1 of this 
+# script to point to the location of pwsh (PowerShell) on your system
 #
 ####################################################################################
 #
@@ -37,6 +37,7 @@
 # 1.0.7 Add Namespace to PV output
 # 1.0.8 Better error handling to ensure context and vCenter match
 # 1.0.9 Add networking information for services
+# 1.1.0 CSI check and version reporting
 #
 ####################################################################################
 #
@@ -53,7 +54,7 @@ Set-PowerCLIConfiguration -DisplayDeprecationWarnings $false -confirm:$false > /
 function usage()
 {
 	WRITE-HOST
-	WRITE-HOST "*** vTopology version 1.0.9 ***"
+	WRITE-HOST "*** vTopology version 1.1.0 ***"
 	WRITE-HOST
     WRITE-HOST "Usage: kubectl vtopology <connect-args> <args>"
 	WRITE-HOST
@@ -78,6 +79,7 @@ function usage()
     WRITE-HOST "  -kn <node_name> - display vSphere VM details about a Kubernetes node"
 	WRITE-HOST "  -sp <policy>    - display details about a storage policy"
 	WRITE-HOST "  -sv <service>   - display details about a service"
+	WRITE-HOST "  -csi            - display CSI driver status and versioning information"
     WRITE-HOST
     WRITE-HOST "Note this tool requires PowerShell with PowerCLI, kubectl and awk"
     WRITE-HOST
@@ -311,7 +313,6 @@ function get_vms([string]$server, [string]$user, [string]$passwd)
 #
 ##########################################################
 
-
 function get_networks([string]$server, [string]$user, [string]$passwd)
 {
 
@@ -473,7 +474,6 @@ Write-Host
 # Get ALL Datastores
 #
 ##########################################################
-
 
 function get_datastores([string]$server, [string]$user, [string]$passwd)
 {
@@ -773,13 +773,11 @@ function get_k8s_node_info([string]$server, [string]$user, [string]$passwd, [str
 	Disconnect-VIServer * -Confirm:$false
 }
 
-#
 #######################################################################
 #
 #-- v1.0.2 Get Storage Policies
 #
 #######################################################################
-#
 
 function get_spbm([string]$server, [string]$user, [string]$passwd)
 {
@@ -804,14 +802,12 @@ function get_spbm([string]$server, [string]$user, [string]$passwd)
 
 }
 
-#
 #######################################################################
 #
 # Get Ophaned PVs - PVs not connected to any Pods/K8s worker nodes
 # Added to v1.0.6
 #
 #######################################################################
-#
 
 function get_orphanpvs([string]$server, [string]$user, [string]$passwd)
 {
@@ -931,7 +927,7 @@ function get_orphanpvs([string]$server, [string]$user, [string]$passwd)
 
 ###############################################################################################
 #
-#--If we don't have any orphans, lets report that as well instead of just finishing silently
+#-- If we don't have any orphans, lets report that as well instead of just finishing silently
 #
 ###############################################################################################
 	
@@ -951,14 +947,11 @@ function get_orphanpvs([string]$server, [string]$user, [string]$passwd)
 	Disconnect-VIServer * -Confirm:$false
 }
 
-#
 #######################################################################
 #
-# Get vSphere Tags
-# Added to v1.0.1
-#
+#-- v1.0.1 - Get vSphere Tags
+# 
 #######################################################################
-#
 
 function get_tags([string]$server, [string]$user, [string]$passwd)
 {
@@ -1059,13 +1052,11 @@ function get_tags([string]$server, [string]$user, [string]$passwd)
 	Disconnect-VIServer * -Confirm:$false
 }
 
-#
 #######################################################################
 #
 # Get ALL Kubernetes VMs
 #
 #######################################################################
-#
 
 function get_k8svms([string]$server, [string]$user, [string]$passwd)
 {
@@ -1094,7 +1085,7 @@ function get_k8svms([string]$server, [string]$user, [string]$passwd)
 
 #########################################################################
 #
-# -- slowest part of script - need to find a better way of finding the VM
+#-- slowest part of script - need to find a better way of finding the VM
 #
 #########################################################################
 
@@ -1171,8 +1162,7 @@ function get_k8svms([string]$server, [string]$user, [string]$passwd)
 
 #######################################################################
 #
-# Get individual SPBM Policy Info
-# Added to v1.0.2
+#-- v1.0.2 - Get individual SPBM Policy Info
 #
 #######################################################################
 
@@ -1221,7 +1211,14 @@ function get_pv_info([string]$server, [string]$user, [string]$passwd, [string]$p
 #######################################################################
 #
 
-        $is_vsphere = & kubectl describe pv $pvid | grep "    Type" | awk '{print $2}'
+        $is_vsphere = & kubectl describe pv $pvid 2>/dev/null | grep "    Type" | awk '{print $2}'
+
+	if ( $? -eq $False )
+	{
+		Write-Host "Error getting information about PV $pvid - is this a valid PV for this K8s cluster ${context}?"
+		Write-Host
+		exit;
+	}
 
         if ( $is_vsphere -eq "vSphereVolume" )
 	{
@@ -1482,8 +1479,214 @@ function get_pv_info([string]$server, [string]$user, [string]$passwd, [string]$p
 		Write-Host
 	}
 
+###########################################################################################
+#
+#-- 5. CSI driver details
+#
+###########################################################################################
+
+        if ( $is_vsphere -eq "CSI" )
+	{
+		Write-Host
+		Write-Host "=== CSI Driver Information ==="
+		Write-Host
+
+		check_csi
+	}
+
 	Disconnect-VIServer * -Confirm:$false
 }
+
+#########################################
+#
+# Check CSI driver and version
+#
+#########################################
+
+function check_csi()
+{
+	#WRITE-HOST " Debug : Check CSI has been called"
+
+###########################################################################
+#
+#-- Check Images
+#
+# Upstream K8s CSI driver and TKG are in the kube-system namespace
+# WCP/vSphere with Tanzu deployment puts CSI in vmware-system-csi namespace
+#
+###########################################################################
+
+	$csi_image_count = 0
+        $is_wcp = 0
+	$AllCSIImages = & kubectl describe deploy vsphere-csi-controller -n kube-system 2>/dev/null | grep Image | awk '{print $2}' 
+
+
+########################################################################
+#
+#- if the previous command failed, then lets try WCP
+#
+########################################################################
+
+	if ( $? -eq $False )
+	{
+		#Write-Host "DEBUG - WCP Deployment"
+		$AllCSIImages = & kubectl describe deploy vsphere-csi-controller -n vmware-system-csi | grep Image | awk '{print $2}' 
+	}
+
+#######################################################
+#
+#-- Differentiate images used in native K8s versus TKG
+#
+#######################################################
+
+	WRITE-Host "`t=== Found CSI Images:"
+	WRITE-HOST
+	foreach ($csiImage in $AllCSIImages)
+	{
+		#WRITE-HOST " DEBUG : Found $csiImage"
+		if (($csiImage -match ".tkg.") -or ($csiImage -match "quay"))
+		{
+			$csi_image_details = $csiImage -split "/"
+			$csi_image = $csi_image_details[2]
+			#Write-Host " DEBUG $csi_image"
+		}
+		elseif ($csiImage -match "localhost")
+		{
+			$csi_image_details = $csiImage -split "/vmware/"
+			$csi_image = $csi_image_details[1]
+			$is_wcp = 1
+		}
+		else
+		{
+			$csi_image_details = $csiImage -split "/"
+			$csi_image = $csi_image_details[4]
+		}
+
+		WRITE-Host "`t`t" $csi_image
+		$csi_image_count = $csi_image_count + 1
+	}
+
+	WRITE-HOST
+	WRITE-HOST "`tFound a total of $csi_image_count CSI Images."
+	WRITE-HOST
+
+	if ($csi_image_count -gt 0)
+	{
+		WRITE-HOST "`t=== CSI Controller and Node checks"
+		WRITE-HOST
+
+##############################
+#
+#-- Check if this is WCP
+#
+##############################
+
+		if ( $is_wcp -eq 0 )
+		{
+
+##############################
+#
+#-- Check Controller is Ready
+#
+##############################
+
+			$ctlr_info = & kubectl get deployment vsphere-csi-controller -n kube-system --no-headers | awk '{print $2}' 2>/dev/null
+	
+			$cltr_status = $ctlr_info -split "/"
+
+			$ctlr_desired = $cltr_status[0]
+			$ctlr_ready = $cltr_status[1]
+	
+			if ( $ctlr_desired -eq $ctlr_ready )
+			{
+				WRITE-HOST "`t`tCSI Controller Status OK - Found $ctlr_ready out of $ctlr_desired CSI controllers ready"
+			}
+			else 
+			{
+				WRITE-HOST "`t`tCSI Controller Status ERROR - Found $ctlr_ready out of $ctlr_desired CSI controllers ready"
+			}
+	
+##############################
+#
+#-- Check Nodes are Ready
+#
+##############################
+
+			$csinode_info = & kubectl get daemonset vsphere-csi-node -n kube-system --no-headers 2>/dev/null
+
+			$csinode_status = $csinode_info -split "\s+"
+
+			$csinode_desired = $csinode_status[1]
+			$csinode_ready = $csinode_status[3]
+
+			if ( $csinode_desired -eq $csinode_ready )
+			{
+				WRITE-HOST "`t`tCSI Node Status OK - Found $csinode_ready out of $csinode_desired CSI nodes ready"
+			}
+			else 
+			{
+				WRITE-HOST "`t`tCSI Node Status ERROR - Found $csinode_ready out of $csinode_desired CSI nodes ready"
+			}
+
+			$nodecount = & kubectl get nodes --no-headers | wc -l
+
+#########################
+#
+#-- Clean up blank spaces
+#
+#########################
+
+			$nodecount = $nodecount -replace '\s',''
+
+			if ( $nodecount -eq $csinode_ready )
+			{
+				WRITE-HOST "`t`tCSI Node Status OK - CSI Node count $csinode_ready matches number of K8s nodes $nodecount"
+			}
+			else 
+			{
+				WRITE-HOST "`t`tCSI Node Status ERROR - CSI Node count $csinode_ready does not match number of K8s nodes $nodecount"
+			}
+			WRITE-HOST
+		}
+		elseif ( $is_wcp -eq 1 )
+		{
+
+##############################
+#
+#-- Check Controller is Ready
+#
+##############################
+
+			$ctlr_info = & kubectl get deployment vsphere-csi-controller -n vmware-system-csi --no-headers | awk '{print $2}' 2>/dev/null
+	
+			$cltr_status = $ctlr_info -split "/"
+
+			$ctlr_desired = $cltr_status[0]
+			$ctlr_ready = $cltr_status[1]
+	
+			if ( $ctlr_desired -eq $ctlr_ready )
+			{
+				WRITE-HOST "`t`tCSI Controller Status OK - Found $ctlr_ready out of $ctlr_desired CSI controllers ready"
+			}
+			else 
+			{
+				WRITE-HOST "`t`tCSI Controller Status ERROR - Found $ctlr_ready out of $ctlr_desired CSI controllers ready"
+			}
+
+#################################
+#
+#-- Cannot do node checks on WCP
+#
+#################################
+
+		}
+		else
+		{
+			WRITE-HOST "Unable to continue CSI checks"
+		}
+	}
+}
+
 
 #######################################################################
 #
@@ -1656,6 +1859,9 @@ else
 							$vcenter_server, $v_username, $v_password = vc_login
 							get_k8s_svc_info $vcenter_server $v_username $v_password $args[1] ; break 
 						}
+				}
+				'-csi'{
+					check_csi ; break
 				}
                 default {
                      		usage
@@ -1833,6 +2039,9 @@ else
 								#Write-Host "Debug: KN - vCenter Server $vcenter_server $args[7]"
 								get_k8s_svc_info $vcenter_server $v_username $v_password $args[7] ;break 
 						}
+					}
+					'-csi'{
+						check_csi ; break
 					}
                 	default {
                        	 		usage
