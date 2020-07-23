@@ -4,9 +4,9 @@
 
 vtopology is a combination of bash and Powershell/PowerCLI for displaying vSphere topology from kubectl. The idea is that you should be able to map Kubernetes objects (e.g. nodes, PVs) to vSphere objects (e.g. virtual machines, VMDKs). Once installed, users can run vtopology and display underlying vSphere infrastructure components to see how their Kubernetes cluster is consuming vSphere resources.
 
-The script can be run as a stanalone powershell script or run as a krew plugin. Running as a krew plugin means that users can run the tool via a 'kubectl vtopology' command.
+The script can be run as a stanalone powershell script or run as a krew plugin. Running as a krew plugin means that users can run the tool via a 'kubectl vtopology' command. Both the code (.ps1) and the tar+zip bundle required by krew are available.
 For more information about how to install krew, go here: https://github.com/kubernetes-sigs/krew/blob/master/README.md.
-Alternatively, simply extract the tar/gzip bundle and type 'pwsh ./vtopology.ps1 -h' for help on how to run the tool.
+Alternatively, simply download and run the PowerShel script via 'pwsh ./vtopology.ps1 -h' for help on how to run the tool.
 
 Both PowerShell and PowerCLI are required for this tool to work. For PowerShell and PowerCLI deployment instructions on Ubuntu, go here:
 https://blog.inkubate.io/install-powershell-and-powercli-on-ubuntu-16-04/ (you will need to modify the instructions slightly to point to the correct repository for your OS version - I have used the same steps to deploy Ubuntu 17.04)
@@ -212,4 +212,23 @@ $ kubectl vtopology -vc 1.2.3.4 -u administrator@vsphere.local -p password -pv p
         Persistent Volume Claim :  cassandra-csi-data-cassandra-1
         Used by Pod             :  cassandra-1
         Attached to K8s Node    :  k8s-worker-02
+
+=== CSI Driver Information ===
+
+        === Found CSI Images:
+
+                 csi-attacher:v2.0.0_vmware.1
+                 vsphere-block-csi-driver:v2.0.0_vmware.1
+                 csi-livenessprobe:v1.1.0_vmware.7
+                 volume-metadata-syncer:v2.0.0_vmware.1
+                 csi-provisioner:v1.4.0_vmware.2
+
+        Found a total of 5 CSI Images.
+
+        === CSI Controller and Node checks
+
+                CSI Controller Status OK - Found 1 out of 1 CSI controllers ready
+                CSI Node Status OK - Found 4 out of 4 CSI nodes ready
+                CSI Node Status OK - CSI Node count 4 matches number of K8s nodes 4
+                        
 ```
