@@ -3,13 +3,13 @@ kind: Plugin
 metadata:
   name: vtopology
 spec:
-  version: "v1.1.0"
+  version: "v1.1.1"
   platforms:
   - selector:
       matchExpressions:
       - {key: os, operator: In, values: [linux,darwin]}
     uri: ./vtopology.tar.gz
-    sha256: "b730aaf4eb7c5aadd16da7249098f17c7f6274b21ca1afe6704a9d9714bf98ac"
+    sha256: "2adfbbdb9de5f4b386d62b3661539962e0d1c3b468edde90e49ddde2b81fd7d5"
     files:
     - from: "/*.ps1"
       to: "."     

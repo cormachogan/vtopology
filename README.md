@@ -4,21 +4,20 @@
 
 vtopology is a combination of bash and Powershell/PowerCLI for displaying vSphere topology from kubectl. The idea is that you should be able to map Kubernetes objects (e.g. nodes, PVs) to vSphere objects (e.g. virtual machines, VMDKs). Once installed, users can run vtopology and display underlying vSphere infrastructure components to see how their Kubernetes cluster is consuming vSphere resources.
 
-The script can be run as a stanalone powershell script or run as a krew plugin. Running as a krew plugin means that users can run the tool via a 'kubectl vtopology' command. Both the code (.ps1) and the tar+zip bundle required by krew are available.
-For more information about how to install krew, go here: https://github.com/kubernetes-sigs/krew/blob/master/README.md.
+The script can be run as a stanalone powershell script or run as a krew plugin. Running as a krew plugin means that users can run the tool via a 'kubectl vtopology' command. Both the code (.ps1) and the tar+zip bundle (required for krew) are available for download.
+For more information about how to install krew, go here: <https://github.com/kubernetes-sigs/krew/blob/master/README.md>.
 Alternatively, simply download and run the PowerShell script via 'pwsh ./vtopology.ps1 -h' for help on how to run the tool.
 
 Both PowerShell and PowerCLI are required for this tool to work. For PowerShell and PowerCLI deployment instructions on Ubuntu, go here:
-https://blog.inkubate.io/install-powershell-and-powercli-on-ubuntu-16-04/ (you will need to modify the instructions slightly to point to the correct repository for your OS version - I have used the same steps to deploy Ubuntu 17.04)
+<https://blog.inkubate.io/install-powershell-and-powercli-on-ubuntu-16-04/> (you will need to modify the instructions slightly to point to the correct repository for your OS version - I have used the same steps to deploy Ubuntu 17.04)
 
-This tool has been tested and validated on Ubuntu 17.04. It has also been tested and validated on MacOS (Darwin) but the shell interpreter path to PowerShell (line 1 of vtopology.ps1 script) needs to be changed accordingly. On my MacOS environment, pwsh was found is /usr/local/bin. Once vtopology is installed by krew, it can be found in ~/.krew/store/vtopology.
-
+This tool has been tested and validated on Ubuntu 17.04. It has also been tested and validated on MacOS (Darwin) but the shell interpreter path to PowerShell (line 1 of vtopology.ps1 script) may need to be changed accordingly. On my MacOS environment, pwsh was found is /usr/local/bin. Once vtopology is installed by krew, the code can be found in ~/.krew/store/vtopology.
 
 ## vtopology Deployment instructions for krew
 
 Download both the yaml and gz archives and install vToplogy with krew as follows:
 
-```
+```bash
 $ kubectl krew  install --manifest=vtopology.yaml --archive=vtopology.tar.gz
 Installing plugin: vtopology
 CAVEATS:
@@ -29,8 +28,9 @@ CAVEATS:
 Installed plugin: vtopology
 ```
 
-## Usage:
-```
+## Usage
+
+```bash
 Usage: kubectl vtopology <connect-args> <args>
 
   where connect-args (optionally) includes the following:
@@ -59,8 +59,9 @@ Advanced args
 Note this tool requires PowerShell with PowerCLI, kubectl and awk
 ```
 
-## Sample outputs:
-```
+## Sample outputs
+
+```bash
 $ kubectl vtopology -vc 1.2.3.4 -u administrator@vsphere.local -p password -e
 
 *** This command is being run against the following Kubernetes configuration context:  kubernetes-admin@kubernetes
@@ -133,7 +134,7 @@ $ kubectl vtopology -vc 1.2.3.4 -u administrator@vsphere.local -p password -k
 
 Kubernetes Node VM Name  :  k8s-master
 
-        IP Address             :  10.27.51.39
+        IP Address             :  10.0.0.39
         Power State            :  PoweredOn
         On ESXi host           :  esxi-dell-h.rainpole.com
         Folder                 :  ubuntu64Guest
@@ -147,7 +148,7 @@ Kubernetes Node VM Name  :  k8s-master
 
 Kubernetes Node VM Name  :  k8s-worker1
 
-        IP Address             :  10.27.51.40
+        IP Address             :  10.0.0.40
         Power State            :  PoweredOn
         On ESXi host           :  esxi-dell-g.rainpole.com
         Folder                 :  ubuntu64Guest
@@ -161,7 +162,7 @@ Kubernetes Node VM Name  :  k8s-worker1
 
 Kubernetes Node VM Name  :  k8s-worker2
 
-        IP Address             :  10.27.51.41
+        IP Address             :  10.0.0.41
         Power State            :  PoweredOn
         On ESXi host           :  esxi-dell-h.rainpole.com
         Folder                 :  ubuntu64Guest
@@ -171,7 +172,7 @@ Kubernetes Node VM Name  :  k8s-worker2
         Memory (GB)            :  4
         Provisioned Space (GB) :  65.08
         Used Space (GB)        :  14.95
-       
+
 ---
 
 $ kubectl vtopology -vc 1.2.3.4 -u administrator@vsphere.local -p password -pv pvc-f721b470-d312-40a6-9f0b-a6f18f806b8f

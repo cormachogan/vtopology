@@ -38,6 +38,7 @@
 # 1.0.8 Better error handling to ensure context and vCenter match
 # 1.0.9 Add networking information for services
 # 1.1.0 CSI check and version reporting
+# 1.1.1 CSI bug fix for TKGI/PKS and CSI 1.x implementations
 #
 ####################################################################################
 #
@@ -1485,7 +1486,7 @@ function get_pv_info([string]$server, [string]$user, [string]$passwd, [string]$p
 #
 ###########################################################################################
 
-        if ( $is_vsphere -eq "CSI" )
+    if ( $is_vsphere -eq "CSI" )
 	{
 		Write-Host
 		Write-Host "=== CSI Driver Information ==="
@@ -1514,18 +1515,35 @@ function check_csi()
 # Upstream K8s CSI driver and TKG are in the kube-system namespace
 # WCP/vSphere with Tanzu deployment puts CSI in vmware-system-csi namespace
 #
+# -- v1.1.1
+# Other considerations are that CSI 1.x deployed the vsphere-csi-controller
+# as a statefulset, where as CSI 2.x deploys it as a deployment
+#
 ###########################################################################
 
 	$csi_image_count = 0
-        $is_wcp = 0
+    $is_wcp = 0
+	
 	$AllCSIImages = & kubectl describe deploy vsphere-csi-controller -n kube-system 2>/dev/null | grep Image | awk '{print $2}' 
 
+##############################################################################
+#
+#-- v1.1.1
+#-- if the previous command failed, then lets see if it is a statefulset (1.x)
+#
+##############################################################################
 
-########################################################################
+	if ( $? -eq $False )
+	{
+		#Write-Host "DEBUG - CSI 1.x StatefulSet"
+		$AllCSIImages = & kubectl describe sts vsphere-csi-controller -n kube-system | grep Image | awk '{print $2}' 
+	}
+
+##############################################################################
 #
-#- if the previous command failed, then lets try WCP
+#- if the previous command failed, then lets see if it is WCP/Project Pacific
 #
-########################################################################
+##############################################################################
 
 	if ( $? -eq $False )
 	{
@@ -1533,11 +1551,26 @@ function check_csi()
 		$AllCSIImages = & kubectl describe deploy vsphere-csi-controller -n vmware-system-csi | grep Image | awk '{print $2}' 
 	}
 
-#######################################################
+################################
 #
-#-- Differentiate images used in native K8s versus TKG
+# If no CSI images found, exit
 #
-#######################################################
+################################
+
+	if ( $? -eq $False )
+	{
+		Write-Host "Unable to find any CSI images in this environment"
+		Write-Host
+		exit
+	}
+
+##################################################################
+#
+#-- Differentiate images used in native K8s versus TKG versus WCP
+#-- Images come from various places such as quay and gcr
+#-- But for TKG, the are pulled locally
+#
+#################################################################
 
 	WRITE-Host "`t=== Found CSI Images:"
 	WRITE-HOST
