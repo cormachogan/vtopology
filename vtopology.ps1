@@ -1522,26 +1522,28 @@ function check_csi()
 ###########################################################################
 
 	$csi_image_count = 0
-    $is_wcp = 0
+	$is_wcp = 0
+	$is_v1 = 0
 	
 	$AllCSIImages = & kubectl describe deploy vsphere-csi-controller -n kube-system 2>/dev/null | grep Image | awk '{print $2}' 
 
-##############################################################################
+##################################################################################
 #
 #-- v1.1.1
-#-- if the previous command failed, then lets see if it is a statefulset (1.x)
+#-- if the previous command failed, then lets see if it is a statefulset (CSI 1.x)
 #
-##############################################################################
+##################################################################################
 
 	if ( $? -eq $False )
 	{
 		#Write-Host "DEBUG - CSI 1.x StatefulSet"
-		$AllCSIImages = & kubectl describe sts vsphere-csi-controller -n kube-system | grep Image | awk '{print $2}' 
+		$AllCSIImages = & kubectl describe sts vsphere-csi-controller -n kube-system | grep Image | awk '{print $2}'
+		$is_v1 = 1 
 	}
 
 ##############################################################################
 #
-#- if the previous command failed, then lets see if it is WCP/Project Pacific
+#-- if the previous command failed, then lets see if it is WCP/Project Pacific
 #
 ##############################################################################
 
@@ -1553,14 +1555,15 @@ function check_csi()
 
 ################################
 #
-# If no CSI images found, exit
+#-- If no CSI images found, exit
 #
 ################################
 
 	if ( $? -eq $False )
 	{
 		Write-Host "Unable to find any CSI images in this environment"
-		Write-Host
+		Write-Host "Please check that the kubectl context is set correctly,"
+		Write-Host "and that you are pointed at the correct vCenter server"
 		exit
 	}
 
@@ -1608,13 +1611,13 @@ function check_csi()
 		WRITE-HOST "`t=== CSI Controller and Node checks"
 		WRITE-HOST
 
-##############################
+############################################
 #
-#-- Check if this is WCP
+#-- Check if this is WCP/vSphere with Tanzu
 #
-##############################
+###########################################
 
-		if ( $is_wcp -eq 0 )
+		if (( $is_wcp -eq 0 ) && ( $is_v1 -eq 0 ))
 		{
 
 ##############################
@@ -1639,6 +1642,73 @@ function check_csi()
 				WRITE-HOST "`t`tCSI Controller Status ERROR - Found $ctlr_ready out of $ctlr_desired CSI controllers ready"
 			}
 	
+##############################
+#
+#-- Check Nodes are Ready
+#
+##############################
+
+			$csinode_info = & kubectl get daemonset vsphere-csi-node -n kube-system --no-headers 2>/dev/null
+
+			$csinode_status = $csinode_info -split "\s+"
+
+			$csinode_desired = $csinode_status[1]
+			$csinode_ready = $csinode_status[3]
+
+			if ( $csinode_desired -eq $csinode_ready )
+			{
+				WRITE-HOST "`t`tCSI Node Status OK - Found $csinode_ready out of $csinode_desired CSI nodes ready"
+			}
+			else 
+			{
+				WRITE-HOST "`t`tCSI Node Status ERROR - Found $csinode_ready out of $csinode_desired CSI nodes ready"
+			}
+
+			$nodecount = & kubectl get nodes --no-headers | wc -l
+
+#########################
+#
+#-- Clean up blank spaces
+#
+#########################
+
+			$nodecount = $nodecount -replace '\s',''
+
+			if ( $nodecount -eq $csinode_ready )
+			{
+				WRITE-HOST "`t`tCSI Node Status OK - CSI Node count $csinode_ready matches number of K8s nodes $nodecount"
+			}
+			else 
+			{
+				WRITE-HOST "`t`tCSI Node Status ERROR - CSI Node count $csinode_ready does not match number of K8s nodes $nodecount"
+			}
+			WRITE-HOST
+		}
+		elseif (( $is_wcp -eq 0 ) && ( $is_v1 -eq 1 ))
+		{
+#################################################
+#
+#-- v1.1.1 Handle PKS with CSI 1.x - StatefulSet
+#-- Check Controller is Ready
+#
+#################################################
+
+			$ctlr_info = & kubectl get sts vsphere-csi-controller -n kube-system --no-headers | awk '{print $2}' 2>/dev/null
+	
+			$cltr_status = $ctlr_info -split "/"
+
+			$ctlr_desired = $cltr_status[0]
+			$ctlr_ready = $cltr_status[1]
+
+			if ( $ctlr_desired -eq $ctlr_ready )
+			{
+				WRITE-HOST "`t`tCSI Controller Status OK - Found $ctlr_ready out of $ctlr_desired CSI controllers ready"
+			}
+			else 
+			{
+				WRITE-HOST "`t`tCSI Controller Status ERROR - Found $ctlr_ready out of $ctlr_desired CSI controllers ready"
+			}
+
 ##############################
 #
 #-- Check Nodes are Ready
@@ -1715,7 +1785,7 @@ function check_csi()
 		}
 		else
 		{
-			WRITE-HOST "Unable to continue CSI checks"
+			WRITE-HOST "Unable to continue CSI checks - unable to determine K8s distribution type"
 		}
 	}
 }
@@ -1739,7 +1809,7 @@ function get_all([string]$server, [string]$user, [string]$passwd)
 	get_vms $vcenter_server $v_username $v_password
 	Write-Host "=== Hosts ==="
 	get_hosts $vcenter_server $v_username $v_password
-	Write-Host "=== Datastoress ==="
+	Write-Host "=== Datastores ==="
 	get_datastores $vcenter_server $v_username $v_password
 	Write-Host "=== Networks ==="
 	get_networks $vcenter_server $v_username $v_password
@@ -1749,6 +1819,8 @@ function get_all([string]$server, [string]$user, [string]$passwd)
 	get_tags $vcenter_server $v_username $v_password
 	Write-Host "=== Storage Policies ==="
 	get_spbm $vcenter_server $v_username $v_password
+	Write-Host "=== CSI ==="
+	check_csi $vcenter_server $v_username $v_password
 }
 
 ######################################################################
