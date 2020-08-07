@@ -1617,7 +1617,7 @@ function check_csi()
 #
 ###########################################
 
-		if (( $is_wcp -eq 0 ) && ( $is_v1 -eq 0 ))
+		if (( $is_wcp -eq 0 ) -and ( $is_v1 -eq 0 ))
 		{
 
 ##############################
@@ -1684,7 +1684,7 @@ function check_csi()
 			}
 			WRITE-HOST
 		}
-		elseif (( $is_wcp -eq 0 ) && ( $is_v1 -eq 1 ))
+		elseif (( $is_wcp -eq 0 ) -and ( $is_v1 -eq 1 ))
 		{
 #################################################
 #
