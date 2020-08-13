@@ -9,9 +9,11 @@ For more information about how to install krew, go here: <https://github.com/kub
 Alternatively, simply download and run the PowerShell script via 'pwsh ./vtopology.ps1 -h' for help on how to run the tool.
 
 Both PowerShell and PowerCLI are required for this tool to work. For PowerShell and PowerCLI deployment instructions on Ubuntu, go here:
-<https://blog.inkubate.io/install-powershell-and-powercli-on-ubuntu-16-04/> (you will need to modify the instructions slightly to point to the correct repository for your OS version - I have used the same steps to deploy Ubuntu 17.04)
+<https://blog.inkubate.io/install-powershell-and-powercli-on-ubuntu-16-04/> (you will need to modify the instructions slightly to point to the correct repository for your OS version - I have used the same steps to deploy PowerShell and PowerCLI on Ubuntu 17.04)
 
-This tool has been tested and validated on Ubuntu 17.04. It has also been tested and validated on MacOS (Darwin) but the shell interpreter path to PowerShell (line 1 of vtopology.ps1 script) may need to be changed accordingly. On my MacOS environment, pwsh was found is /usr/local/bin. Once vtopology is installed by krew, the code can be found in ~/.krew/store/vtopology.
+This tool has been tested and validated on Ubuntu 17.04. It has also been tested and validated on MacOS (Darwin) but the shell interpreter path to PowerShell (line 1 of vtopology.ps1 script) may need to be changed accordingly. On my MacOS environment, pwsh is found is /usr/local/bin. Once vtopology is installed by krew, the code can be found in ~/.krew/store/vtopology.
+
+To run the tool, ensure that the context is set to the Kubernetes cluster that you wish to query. Then point to the vCenter server which manages the vSphere infrastructure on which your Kubernetes cluster is running. Examples are shown below.
 
 ## vtopology Deployment instructions for krew
 
@@ -55,6 +57,7 @@ Advanced args
   -kn <node_name> - display vSphere VM details about a Kubernetes node
   -sp <policy>    - display details about a storage policy
   -sv <service>   - disply details about a service
+  -csi            - display CSI version and check CSI status
 
 Note this tool requires PowerShell with PowerCLI, kubectl and awk
 ```
