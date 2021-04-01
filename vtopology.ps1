@@ -39,6 +39,7 @@
 # 1.0.9 Add networking information for services
 # 1.1.0 CSI check and version reporting
 # 1.1.1 CSI bug fix for TKGI/PKS and CSI 1.x implementations
+# 1.1.2 Handle the fact that WCP seems to only have INTERNAL-IPs for nodes
 #
 ####################################################################################
 #
@@ -1084,14 +1085,7 @@ function get_k8svms([string]$server, [string]$user, [string]$passwd)
 		{
 			#Write-Host "DEBUG: K8s node with EXTERNAL $IPAddress found"
 
-#########################################################################
-#
-#-- slowest part of script - need to find a better way of finding the VM
-#
-#########################################################################
-
 			$K8SVMS = Get-VM -NoRecursion | Where-Object { $_.Guest.IPAddress -eq $IPAddress } 
-
 
 			foreach ($KVM in $K8SVMS)
 			{
@@ -1140,6 +1134,77 @@ function get_k8svms([string]$server, [string]$user, [string]$passwd)
 				}
 
 				$node_count = $node_count + 1
+			}
+		}
+	}
+
+#########################################################################
+#
+#-- v1.1.2 vSphere with Tanzu/WCP only has INTERNAL-IPs
+#
+#########################################################################
+
+
+	if ( $node_count -eq 0 )
+	{
+		$K8SVMIPS = & kubectl get nodes -o wide | awk '{print $6}'
+	
+		foreach ($IPAddress in $K8SVMIPS)
+		{
+			if ($IPAddress -NotMatch "INTERNAL")
+			{
+				#Write-Host "DEBUG: K8s node with INTERNAL $IPAddress found"
+
+				$K8SVMS = Get-VM -NoRecursion | Where-Object { $_.Guest.IPAddress -eq $IPAddress } 
+	
+				foreach ($KVM in $K8SVMS)
+				{
+					Write-Host
+					Write-Host "Kubernetes Node VM Name  : " $KVM.Name
+					Write-Host
+					Write-Host "`tIP Address             : " $IPAddress
+					Write-Host "`tPower State            : " $KVM.PowerState
+					Write-Host "`tOn ESXi host           : " $KVM.VMHost
+	
+					$KNodeDC = Get-Datacenter -VMHost $KVM.VMHost
+					$KNodeCluster = Get-Cluster -VMHost $KVM.VMHost
+	
+					Write-Host "`tOn Cluster             : " $KNodeDC.Name
+					Write-Host "`tOn Datacenter          : " $KNodeCluster.Name
+					Write-Host "`tFolder                 : " $KVM.GuestId
+					Write-Host "`tHardware Version       : " $KVM.HardwareVersion
+					Write-Host "`tNumber of CPU          : " $KVM.NumCpu
+					Write-Host "`tCores per Socket       : " $KVM.CoresPerSocket
+					Write-Host "`tMemory (GB)            : " $KVM.MemoryGB
+	
+	####################################################################################################################
+	#
+	# These values return far too many decimal places. This technique limits the value displayed to two decimal places
+	#
+	####################################################################################################################
+	
+					$RoundedProvisionedSpaceGB = "{0:N2}" -f $KVM.ProvisionedSpaceGB
+					Write-Host "`tProvisioned Space (GB) : " $RoundedProvisionedSpaceGB
+					$RoundedUsedSpaceGB = "{0:N2}" -f $KVM.UsedSpaceGB
+					Write-Host "`tUsed Space (GB)        : " $RoundedUsedSpaceGB
+					Write-Host
+	
+	####################################################################################################################
+	#
+	#-- v1.0.3 VM/Host Group Information
+	#
+	####################################################################################################################
+	
+					$KVMGroupInfo = Get-DRSclusterGroup -VM $KVM
+	
+					foreach ($kvmgroup in $KVMGroupInfo)
+					{
+						Write-Host "`tVirtual Machine" $KVM.Name "is part of VM/Host Group" $kvmgroup.Name
+						Write-Host
+					}
+	
+					$node_count = $node_count + 1
+				}
 			}
 		}
 	}
@@ -1498,6 +1563,8 @@ function get_pv_info([string]$server, [string]$user, [string]$passwd, [string]$p
 	Disconnect-VIServer * -Confirm:$false
 }
 
+
+
 #########################################
 #
 # Check CSI driver and version
@@ -1506,14 +1573,14 @@ function get_pv_info([string]$server, [string]$user, [string]$passwd, [string]$p
 
 function check_csi()
 {
-	#WRITE-HOST " Debug : Check CSI has been called"
 
 ###########################################################################
 #
 #-- Check Images
 #
-# Upstream K8s CSI driver and TKG are in the kube-system namespace
+# Upstream K8s CSI driver and TKGm are in the kube-system namespace
 # WCP/vSphere with Tanzu deployment puts CSI in vmware-system-csi namespace
+# TKGS puts CSI in vmware-system-csi namespace also
 #
 # -- v1.1.1
 # Other considerations are that CSI 1.x deployed the vsphere-csi-controller
@@ -1522,6 +1589,7 @@ function check_csi()
 ###########################################################################
 
 	$csi_image_count = 0
+	$is_upstream = 0
 	$is_wcp = 0
 	$is_v1 = 0
 	
@@ -1534,23 +1602,42 @@ function check_csi()
 #
 ##################################################################################
 
-	if ( $? -eq $False )
+	if ( $null -eq $AllCSIImages )
 	{
-		#Write-Host "DEBUG - CSI 1.x StatefulSet"
-		$AllCSIImages = & kubectl describe sts vsphere-csi-controller -n kube-system | grep Image | awk '{print $2}'
-		$is_v1 = 1 
+		#Write-Host "DEBUG - CSI 1.x StatefulSet check"
+		$AllCSIImages = & kubectl describe sts vsphere-csi-controller -n kube-system 2>/dev/null | grep Image | awk '{print $2}'
+	}
+	else
+	{
+###############################################################################
+#
+#-- If we land here, then it means we must have had some images previously
+#   So this must be Upstream K8s or TKGm
+#
+###############################################################################
+		$is_upstream = 1
 	}
 
 ##############################################################################
 #
-#-- if the previous command failed, then lets see if it is WCP/Project Pacific
+#-- if the previous command failed, then it is WCP/Project Pacific or TKG
 #
 ##############################################################################
 
-	if ( $? -eq $False )
+	if ( $null -eq $AllCSIImages )
 	{
-		#Write-Host "DEBUG - WCP Deployment"
-		$AllCSIImages = & kubectl describe deploy vsphere-csi-controller -n vmware-system-csi | grep Image | awk '{print $2}' 
+		#Write-Host "DEBUG - WCP Deployment check"
+		$AllCSIImages = & kubectl describe deploy vsphere-csi-controller -n vmware-system-csi 2>/dev/null | grep Image | awk '{print $2}' 
+	}
+###############################################################################
+#
+#-- If we land here, then it means we must have had some images previously
+#   So this must be CSI 1.x (unless we already know it us upstream or TKGm)
+#
+###############################################################################
+	elseif ( $is_upstream -eq 0 )
+	{
+		$is_v1 = 1 
 	}
 
 ################################
@@ -1571,7 +1658,7 @@ function check_csi()
 #
 #-- Differentiate images used in native K8s versus TKG versus WCP
 #-- Images come from various places such as quay and gcr
-#-- But for TKG, the are pulled locally
+#-- For TKG, the are pulled locally
 #
 #################################################################
 
@@ -1580,22 +1667,30 @@ function check_csi()
 	foreach ($csiImage in $AllCSIImages)
 	{
 		#WRITE-HOST " DEBUG : Found $csiImage"
-		if (($csiImage -match ".tkg.") -or ($csiImage -match "quay"))
+		if (($csiImage -match "\.tkg\.") -or ($csiImage -match "quay") -or ($csiImage -match "vmware.io"))
 		{
 			$csi_image_details = $csiImage -split "/"
-			$csi_image = $csi_image_details[2]
-			#Write-Host " DEBUG $csi_image"
+			$csi_image = $csi_image_details[-1]
+			#Write-Host " DEBUG: $csi_image is TKG"
 		}
 		elseif ($csiImage -match "localhost")
 		{
 			$csi_image_details = $csiImage -split "/vmware/"
 			$csi_image = $csi_image_details[1]
 			$is_wcp = 1
+			#Write-Host " DEBUG: $csi_image is WCP"
 		}
-		else
+		else 
+###############################################################
+#
+# Could be upstream or TGKm or pulled from private registry
+# -1 refers to the last field
+#
+###############################################################
 		{
 			$csi_image_details = $csiImage -split "/"
-			$csi_image = $csi_image_details[4]
+			$csi_image = $csi_image_details[-1]
+			#Write-Host " DEBUG: $csi_image is Upstream or TKGm"
 		}
 
 		WRITE-Host "`t`t" $csi_image
@@ -1611,14 +1706,104 @@ function check_csi()
 		WRITE-HOST "`t=== CSI Controller and Node checks"
 		WRITE-HOST
 
-############################################
+#########################################################################################
 #
-#-- Check if this is WCP/vSphere with Tanzu
+#-- Check this is WCP/vSphere with Tanzu AND is not using a statefulset (CSI version 1)
+#   and is not upstream, so must be TKGS with images in vmware-csi-namespace
 #
-###########################################
+########################################################################################
 
-		if (( $is_wcp -eq 0 ) -and ( $is_v1 -eq 0 ))
+		if (( $is_wcp -eq 0 ) -and ( $is_v1 -eq 0 ) -and ( $is_upstream -eq 0 ))
 		{
+
+			#WRITE-HOST "`t`tDEBUG: TKGS controller checks"
+
+##############################
+#
+#-- Check Controller is Ready
+#
+##############################
+
+			$ctlr_info = & kubectl get deployment vsphere-csi-controller -n vmware-system-csi --no-headers | awk '{print $2}' 2>/dev/null
+	
+			$cltr_status = $ctlr_info -split "/"
+
+			$ctlr_desired = 0
+                        $ctlr_ready = 0
+
+                        if ($cltr_status[0])
+                        {
+                                $ctlr_desired = $cltr_status[0]
+                        }
+
+                        if ($cltr_status[1])
+                        {
+                                $ctlr_ready = $cltr_status[1]
+                        }
+	
+			if (( $ctlr_desired -gt 0) -and ($ctlr_ready -gt 0) -and ( $ctlr_desired -eq $ctlr_ready ))
+			{
+				WRITE-HOST "`t`tCSI Controller Status OK - Found $ctlr_ready out of $ctlr_desired CSI controllers ready"
+			}
+			else 
+			{
+				WRITE-HOST "`t`tCSI Controller Status ERROR - Found $ctlr_ready out of $ctlr_desired CSI controllers ready"
+			}
+	
+##############################
+#
+#-- Check Nodes are Ready
+#
+##############################
+
+			$csinode_info = & kubectl get daemonset vsphere-csi-node -n vmware-system-csi --no-headers 2>/dev/null
+
+			$csinode_status = $csinode_info -split "\s+"
+
+			$csinode_desired = $csinode_status[1]
+			$csinode_ready = $csinode_status[3]
+
+			if ( $csinode_desired -eq $csinode_ready )
+			{
+				WRITE-HOST "`t`tCSI Node Status OK - Found $csinode_ready out of $csinode_desired CSI nodes ready"
+			}
+			else 
+			{
+				WRITE-HOST "`t`tCSI Node Status ERROR - Found $csinode_ready out of $csinode_desired CSI nodes ready"
+			}
+
+			$nodecount = & kubectl get nodes --no-headers | wc -l
+
+#########################
+#
+#-- Clean up blank spaces
+#
+#########################
+
+			$nodecount = $nodecount -replace '\s',''
+
+			if ( $nodecount -eq $csinode_ready )
+			{
+				WRITE-HOST "`t`tCSI Node Status OK - CSI Node count $csinode_ready matches number of K8s nodes $nodecount"
+			}
+			else 
+			{
+				WRITE-HOST "`t`tCSI Node Status ERROR - CSI Node count $csinode_ready does not match number of K8s nodes $nodecount"
+			}
+			WRITE-HOST
+		}
+
+#########################################################################################
+#
+#-- Check this is WCP/vSphere with Tanzu AND is not using a statefulset (CSI version 1)
+#   and is not TKG, so much be upstream with images in kube-system
+#
+########################################################################################
+
+		elseif (( $is_wcp -eq 0 ) -and ( $is_v1 -eq 0 ) -and ( $is_upstream -eq 1 ))
+		{
+
+			#WRITE-HOST "`t`tDEBUG: TKGm / K8s Upstream controller checks"
 
 ##############################
 #
@@ -1630,10 +1815,20 @@ function check_csi()
 	
 			$cltr_status = $ctlr_info -split "/"
 
-			$ctlr_desired = $cltr_status[0]
-			$ctlr_ready = $cltr_status[1]
+			$ctlr_desired = 0
+                        $ctlr_ready = 0
+
+                        if ($cltr_status[0])
+                        {
+                                $ctlr_desired = $cltr_status[0]
+                        }
+
+                        if ($cltr_status[1])
+                        {
+                                $ctlr_ready = $cltr_status[1]
+                        }
 	
-			if ( $ctlr_desired -eq $ctlr_ready )
+			if (( $ctlr_desired -gt 0) -and ($ctlr_ready -gt 0) -and ( $ctlr_desired -eq $ctlr_ready ))
 			{
 				WRITE-HOST "`t`tCSI Controller Status OK - Found $ctlr_ready out of $ctlr_desired CSI controllers ready"
 			}
@@ -1684,14 +1879,17 @@ function check_csi()
 			}
 			WRITE-HOST
 		}
-		elseif (( $is_wcp -eq 0 ) -and ( $is_v1 -eq 1 ))
-		{
+
 #################################################
 #
 #-- v1.1.1 Handle PKS with CSI 1.x - StatefulSet
-#-- Check Controller is Ready
 #
 #################################################
+
+		elseif (( $is_wcp -eq 0 ) -and ( $is_v1 -eq 1 ))
+		{
+
+			#WRITE-HOST "`t`tDEBUG: CSI V1 controller checks"
 
 			$ctlr_info = & kubectl get sts vsphere-csi-controller -n kube-system --no-headers | awk '{print $2}' 2>/dev/null
 	
@@ -1759,6 +1957,8 @@ function check_csi()
 #-- Check Controller is Ready
 #
 ##############################
+
+			#WRITE-HOST "`t`tDEBUG: WCP controller checks"
 
 			$ctlr_info = & kubectl get deployment vsphere-csi-controller -n vmware-system-csi --no-headers | awk '{print $2}' 2>/dev/null
 	
