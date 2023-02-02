@@ -846,7 +846,7 @@ function get_orphanpvs([string]$server, [string]$user, [string]$passwd)
 
 ###########################################################################################
 #
-#-- Check that we an find the namespace and claim
+#-- Check that we can find the namespace and claim
 #
 ###########################################################################################
 
@@ -854,7 +854,7 @@ function get_orphanpvs([string]$server, [string]$user, [string]$passwd)
 		#Write-Host "DEBUG : Persistent Volume Claim: $pvc_pv"
 		#Write-Host
 
-		$isMounted = & kubectl describe pvc  $pvc_pv -n $pvc_namespace | grep "Mounted By:" | awk -F: '{print $2}'
+		$isMounted = & kubectl describe pvc  $pvc_pv -n $pvc_namespace | grep "Used By:" | awk -F: '{print $2}'
 
 ###########################################################################################
 #
@@ -866,7 +866,7 @@ function get_orphanpvs([string]$server, [string]$user, [string]$passwd)
 
 ###########################################################################################
 #
-#-- Check that we an find the Pod mounting the PV. <none> implies no Pod
+#-- Check that we can find the Pod mounting the PV. <none> implies no Pod
 #
 ###########################################################################################
 
@@ -1458,7 +1458,7 @@ function get_pv_info([string]$server, [string]$user, [string]$passwd, [string]$p
 
 ###########################################################################################
 #
-#-- Check that we an find the namespace and claim
+#-- Check that we can find the namespace and claim
 #
 ###########################################################################################
 
@@ -1466,7 +1466,7 @@ function get_pv_info([string]$server, [string]$user, [string]$passwd, [string]$p
 	#Write-Host "DEBUG : Persistent Volume Claim: $pvc_pv"
 	#Write-Host
 
-	$isMounted = & kubectl describe pvc  $pvc_pv -n $pvc_namespace | grep "Mounted By:" | awk -F: '{print $2}'
+	$isMounted = & kubectl describe pvc  $pvc_pv -n $pvc_namespace | grep "Used By:" | awk -F: '{print $2}'
 
 ###########################################################################################
 #
@@ -1478,7 +1478,7 @@ function get_pv_info([string]$server, [string]$user, [string]$passwd, [string]$p
 
 ###########################################################################################
 #
-#-- Check that we an find the Pod mounting the PV. <none> implies no Pod
+#-- Check that we can find the Pod mounting the PV. <none> implies no Pod
 #
 ###########################################################################################
 
